@@ -48,3 +48,23 @@ Thumbs.db
 .nx/polygraph
 .nx/self-healing
 .nx/migrate-runs
+# environment variables
+.env
+.env.*
+!.env.example
+
+# logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# AI & Editor Tools
+.devin/
+.gemini/
+
+# Generated Prisma Client
+generated/
+/generated/prisma
+
