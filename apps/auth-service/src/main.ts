@@ -6,6 +6,8 @@ import { errorMiddleware } from '../../../packages/error-handler/error-middlewar
 import cookieParser from 'cookie-parser';
 import authRouter from './routes/auth.route';
 import { connectRedis } from '../../../packages/redis/redis';
+import swaggerUi from 'swagger-ui-express';
+import swaggerDocument from './swagger-output.json';
 
 const app = express();
 
@@ -25,6 +27,12 @@ app.get('/api-auth-health', (req, res) => {
   res.json({ message: 'Auth service is healthy' });
 });
 
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
+
+app.get('/docs-json', (req, res) => {
+  res.json(swaggerDocument);
+});
+
 app.use('/', authRouter);
 
 app.get('/', (req, res) => {
@@ -42,6 +50,9 @@ const startServer = async () => {
 
     const server = app.listen(port, () => {
       console.log(`Listening at http://localhost:${port}`);
+      console.log(
+        `Swagger docs available at http://localhost:${port}/api-docs`,
+      );
     });
     server.on('error', console.error);
   } catch (error) {
