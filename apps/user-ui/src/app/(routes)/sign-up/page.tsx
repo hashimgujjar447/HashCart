@@ -232,10 +232,14 @@ const RegisterPage = () => {
           </form>
         ) : (
           <div>
-            <h1 className="text-xl font-semibold text-center mb-4">
-              Enter Otp
-            </h1>
-            <div className="flex justify-center gap-6">
+            <h2 className="text-2xl font-bold text-center text-gray-900 mb-1">
+              Verify OTP
+            </h2>
+            <p className="text-xs text-gray-500 text-center mb-6">
+              Enter the 4-digit code sent to your email
+            </p>
+
+            <div className="flex justify-center gap-3 mb-6">
               {otp?.map((digit, index) => (
                 <input
                   key={index}
@@ -251,9 +255,28 @@ const RegisterPage = () => {
                       inputRefs.current[index] = el;
                     }
                   }}
-                  className="w-12 h-12 border border-gray-300 rounded-md text-center text-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-12 h-12 text-center text-lg font-bold rounded-md border border-gray-200 bg-[#eef3fb] focus:bg-white focus:border-blue-600 focus:outline-none transition-colors"
                 />
               ))}
+            </div>
+
+            <button
+              type="button"
+              className="w-full py-2.5 bg-black hover:bg-neutral-800 text-white font-medium text-xs rounded-md transition-colors cursor-pointer"
+            >
+              Verify OTP
+            </button>
+
+            <div className="text-center mt-4">
+              <span className="text-xs text-gray-500">
+                Didn&apos;t receive code?{' '}
+              </span>
+              <button
+                type="button"
+                className="text-xs text-blue-600 hover:underline font-medium cursor-pointer"
+              >
+                Resend OTP
+              </button>
             </div>
           </div>
         )}
