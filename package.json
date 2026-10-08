@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "npx nx run-many --target=serve --all",
     "postinstall": "prisma skills sync || exit 0",
-    "auth-docs": "node apps/auth-service/src/swagger.js"
+    "auth-docs": "node apps/auth-service/src/swagger.js",
+    "user-ui": "npx nx run-many --target=dev --all --projects=user-ui"
   },
   "private": true,
   "devDependencies": {
@@ -14,15 +15,19 @@
     "@nx/express": "^23.2.0",
     "@nx/jest": "23.2.0",
     "@nx/js": "23.2.0",
+    "@nx/next": "^23.2.0",
     "@nx/node": "^23.2.0",
     "@nx/web": "23.2.0",
     "@nx/webpack": "23.2.0",
     "@pmmmwh/react-refresh-webpack-plugin": "^0.5.7",
     "@svgr/webpack": "^8.0.1",
     "@swc-node/register": "1.11.1",
+    "@swc/cli": "~0.8.1",
     "@swc/core": "1.15.8",
     "@swc/helpers": "0.5.18",
     "@swc/jest": "~0.2.38",
+    "@testing-library/dom": "10.4.0",
+    "@testing-library/react": "16.3.0",
     "@types/cookie-parser": "^1.4.10",
     "@types/cors": "^2.8.19",
     "@types/ejs": "^3.1.5",
@@ -32,9 +37,12 @@
     "@types/jsonwebtoken": "^9.0.10",
     "@types/morgan": "^1.9.10",
     "@types/node": "^24.19.1",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
     "@types/swagger-ui-express": "^4.1.8",
     "esbuild": "^0.27.0",
     "jest": "~30.3.0",
+    "jest-environment-jsdom": "~30.3.0",
     "jest-environment-node": "~30.3.0",
     "jest-util": "~30.3.0",
     "nx": "23.2.0",
@@ -56,6 +64,7 @@
   ],
   "dependencies": {
     "@prisma/client": "^6.19.0",
+    "@tailwindcss/postcss": "^4.3.3",
     "axios": "^1.20.0",
     "bcryptjs": "^3.0.3",
     "cookie-parser": "^1.4.7",
@@ -66,11 +75,18 @@
     "express-http-proxy": "^2.1.2",
     "express-rate-limit": "^8.7.0",
     "jsonwebtoken": "^9.0.3",
+    "lucide-react": "^1.53.0",
     "morgan": "^1.12.1",
+    "next": "~16.1.6",
     "nodemailer": "^10.0.15",
+    "postcss": "^8.5.29",
     "prisma": "^6.19.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "react-icons": "^5.7.0",
     "redis": "^6.3.0",
     "swagger-autogen": "^2.23.7",
-    "swagger-ui-express": "^5.0.1"
+    "swagger-ui-express": "^5.0.1",
+    "tailwindcss": "^4.3.3"
   }
 }

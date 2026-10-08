@@ -68,3 +68,7 @@ pnpm-debug.log*
 generated/
 /generated/prisma
 
+# Next.js
+.next
+out
+test-output
