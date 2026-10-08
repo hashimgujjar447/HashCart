@@ -83,6 +83,7 @@
     "prisma": "^6.19.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
+    "react-hook-form": "^7.89.0",
     "react-icons": "^5.7.0",
     "redis": "^6.3.0",
     "swagger-autogen": "^2.23.7",
