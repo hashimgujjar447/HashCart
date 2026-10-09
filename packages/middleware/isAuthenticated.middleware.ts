@@ -28,7 +28,6 @@ export const isAuthenticated = async (
       select: {
         id: true,
         email: true,
-        role: true,
         name: true,
         following: true,
         createdAt: true,
@@ -43,7 +42,19 @@ export const isAuthenticated = async (
     }
 
     next();
-  } catch (error) {
+  } catch (error: any) {
+    if (
+      error instanceof jwt.TokenExpiredError ||
+      error.name === 'TokenExpiredError'
+    ) {
+      return res.status(401).json({ message: 'Unauthorized: Token expired' });
+    }
+    if (
+      error instanceof jwt.JsonWebTokenError ||
+      error.name === 'JsonWebTokenError'
+    ) {
+      return res.status(401).json({ message: 'Unauthorized: Invalid token' });
+    }
     return next(error);
   }
 };

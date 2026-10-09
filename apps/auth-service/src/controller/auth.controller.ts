@@ -115,13 +115,13 @@ export const loginUser = async (
     }
 
     const accessToken = jwt.sign(
-      { userId: user.id, email: user.email, role: 'user' },
+      { userId: user.id, email: user.email },
       process.env.ACCESS_TOKEN_SECRET!,
       { expiresIn: '15m' },
     );
 
     const refreshToken = jwt.sign(
-      { userId: user.id, email: user.email, role: 'user' },
+      { userId: user.id, email: user.email },
       process.env.REFRESH_TOKEN_SECRET!,
       { expiresIn: '7d' },
     );
@@ -247,7 +247,7 @@ export const refreshToken = async (
     }
 
     const accessToken = jwt.sign(
-      { userId: user.id, email: user.email, role: 'user' },
+      { userId: user.id, email: user.email },
       process.env.ACCESS_TOKEN_SECRET!,
       { expiresIn: '15m' },
     );

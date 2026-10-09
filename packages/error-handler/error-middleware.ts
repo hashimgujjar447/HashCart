@@ -19,6 +19,20 @@ export const errorMiddleware = (
     });
   }
 
+  if (err.name === 'TokenExpiredError') {
+    return res.status(401).json({
+      status: 'error',
+      message: 'Unauthorized: Token expired',
+    });
+  }
+
+  if (err.name === 'JsonWebTokenError') {
+    return res.status(401).json({
+      status: 'error',
+      message: 'Unauthorized: Invalid token',
+    });
+  }
+
   console.error('Unhandled error:', err);
 
   return res.status(500).json({
