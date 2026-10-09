@@ -113,6 +113,8 @@ export const verifyOtp = async (email: string, otp: string) => {
   // clean up after successful verification
   await redisClient.del(`otp:${email}`);
   await redisClient.del(failedAttemptsKey);
+  await redisClient.del(`otp_cooldown:${email}`);
+  await redisClient.del(`otp_spam_lock:${email}`);
 };
 
 // handle forget password
@@ -171,6 +173,10 @@ export const verifyForgetPasswordOtp = async (
     }
 
     await verifyOtp(email, otp);
+
+    await redisClient.set(`password_reset_verified:${email}`, 'true', {
+      EX: 600, // 10 minutes
+    });
 
     res.status(200).json({
       message: 'OTP verified successfully',

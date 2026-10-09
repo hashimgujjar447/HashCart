@@ -1,6 +1,7 @@
 import Header from '@/shared/widgets';
 import './global.css';
 import { Poppins, Roboto } from 'next/font/google';
+import QueryProvider from './providers';
 
 export const metadata = {
   title: 'HashCart',
@@ -28,8 +29,10 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${roboto.variable} ${poppins.variable} `}>
-        <Header />
-        {children}
+        <QueryProvider>
+          <Header />
+          {children}
+        </QueryProvider>
       </body>
     </html>
   );

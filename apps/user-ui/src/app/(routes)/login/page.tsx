@@ -4,6 +4,8 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
+import { useMutation } from '@tanstack/react-query';
+import axios from 'axios';
 
 type FormData = {
   email: string;
@@ -13,7 +15,34 @@ type FormData = {
 const LoginPage = () => {
   const [passwordVisible, setPasswordVisible] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
+  const [serverError, setServerError] = useState<string | null>(null);
+
   const router = useRouter();
+
+  const loginMutation = useMutation({
+    mutationFn: async (data: FormData) => {
+      const response = await axios.post(
+        `${process.env.NEXT_PUBLIC_SERVER_URL}/auth/login`,
+        data,
+      );
+      return response.data;
+    },
+    onSuccess: (data) => {
+      console.log('User logged in successfully:', data);
+      setServerError(null); // Clear any previous error
+      router.push('/');
+    },
+    onError: (error: any) => {
+      console.error(
+        'Login failed:',
+        error.response?.data?.message || error.message,
+      );
+      setServerError(
+        error.response?.data?.message || 'An error occurred during login',
+      );
+    },
+    // Handle error, e.g., show a notification or set an error state
+  });
 
   const {
     register,
@@ -22,7 +51,7 @@ const LoginPage = () => {
   } = useForm<FormData>();
 
   const onSubmit = async (data: FormData) => {
-    // login logic
+    loginMutation.mutate(data);
   };
 
   return (
@@ -30,16 +59,24 @@ const LoginPage = () => {
       <div className="text-center mb-6">
         <h1 className="text-3xl font-bold text-gray-900">Login</h1>
         <p className="text-xs text-gray-500 mt-1">
-          <Link href="/" className="hover:text-blue-600">Home</Link> . Login
+          <Link href="/" className="hover:text-blue-600">
+            Home
+          </Link>{' '}
+          . Login
         </p>
       </div>
 
       <div className="w-full max-w-[440px] bg-white rounded-lg shadow-sm border border-gray-100 p-8">
         <div className="text-center mb-6">
-          <h2 className="text-2xl font-bold text-gray-900">Login to HashCart</h2>
+          <h2 className="text-2xl font-bold text-gray-900">
+            Login to HashCart
+          </h2>
           <p className="text-xs text-gray-500 mt-1.5">
             Don&apos;t have an account?{' '}
-            <Link href="/sign-up" className="text-blue-600 font-medium hover:underline">
+            <Link
+              href="/sign-up"
+              className="text-blue-600 font-medium hover:underline"
+            >
               Sign up
             </Link>
           </p>
@@ -114,13 +151,38 @@ const LoginPage = () => {
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 cursor-pointer"
               >
                 {passwordVisible ? (
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                  <svg
+                    className="w-4 h-4"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth="2"
+                      d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                    />
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth="2"
+                      d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+                    />
                   </svg>
                 ) : (
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l18 18" />
+                  <svg
+                    className="w-4 h-4"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth="2"
+                      d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l18 18"
+                    />
                   </svg>
                 )}
               </button>
@@ -154,7 +216,7 @@ const LoginPage = () => {
             type="submit"
             className="w-full py-2.5 bg-black hover:bg-neutral-800 text-white font-medium text-xs rounded-md transition-colors cursor-pointer mt-2"
           >
-            Login
+            {loginMutation.isPending ? 'Logging in...' : 'Login'}
           </button>
         </form>
       </div>

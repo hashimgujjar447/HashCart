@@ -1,9 +1,11 @@
 'use client';
 
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
+import { useMutation } from '@tanstack/react-query';
+import axios, { AxiosError } from 'axios';
 
 type FormData = {
   name: string;
@@ -11,16 +13,29 @@ type FormData = {
   password: string;
 };
 
+type VerifyUserData = {
+  name: string;
+  email: string;
+  password: string;
+  otp: string;
+};
+
+type ApiErrorResponse = {
+  status?: string;
+  message?: string;
+  details?: Record<string, string>;
+};
+
 const RegisterPage = () => {
   const [passwordVisible, setPasswordVisible] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
-  const [canResend, setCanResend] = useState<boolean>(true);
+  const [canResend, setCanResend] = useState<boolean>(false);
   const [timer, setTimer] = useState<number>(60);
   const [otp, setOtp] = useState<string[]>(['', '', '', '']);
   const [userData, setUserData] = useState<FormData | null>(null);
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
-  const [showOtp, setShowOtp] = useState(true);
+  const [showOtp, setShowOtp] = useState(false);
   const router = useRouter();
 
   const {
@@ -29,8 +44,66 @@ const RegisterPage = () => {
     formState: { errors },
   } = useForm<FormData>();
 
+  useEffect(() => {
+    if (!showOtp || timer <= 0) {
+      if (timer <= 0) setCanResend(true);
+      return;
+    }
+
+    const intervalId = setInterval(() => {
+      setTimer((prev) => prev - 1);
+    }, 1000);
+
+    return () => clearInterval(intervalId);
+  }, [showOtp, timer]);
+
+  const signupMutation = useMutation({
+    mutationFn: async (data: FormData) => {
+      const response = await axios.post(
+        `${process.env.NEXT_PUBLIC_SERVER_URL}/auth/register`,
+        data,
+      );
+      return response.data;
+    },
+    onSuccess: (_, formData) => {
+      setServerError(null);
+      setUserData(formData);
+      setShowOtp(true);
+      setCanResend(false);
+      setTimer(60);
+      setOtp(['', '', '', '']);
+    },
+    onError: (error: AxiosError<ApiErrorResponse>) => {
+      const message =
+        error.response?.data?.message ||
+        'Failed to send registration OTP. Please try again.';
+      setServerError(message);
+    },
+  });
+
+  const verifyOtpMutation = useMutation({
+    mutationFn: async (data: VerifyUserData) => {
+      const response = await axios.post(
+        `${process.env.NEXT_PUBLIC_SERVER_URL}/auth/verify`,
+        data,
+      );
+      return response.data;
+    },
+    onSuccess: () => {
+      setServerError(null);
+      router.push('/login');
+    },
+    onError: (error: AxiosError<ApiErrorResponse>) => {
+      const message =
+        error.response?.data?.message ||
+        'OTP verification failed. Please try again.';
+      setServerError(message);
+    },
+  });
+
   const handleOtpChange = (index: number, value: string) => {
     if (!/^[0-9]?$/.test(value)) return;
+    setServerError(null);
     const oldOtp = [...otp];
     oldOtp[index] = value;
     setOtp(oldOtp);
@@ -48,8 +121,31 @@ const RegisterPage = () => {
     }
   };
 
+  const verifyOtpCode = async () => {
+    if (!userData) return;
+    const otpValue = otp.join('');
+    if (otpValue.length !== 4) {
+      setServerError('Please enter a complete 4-digit OTP.');
+      return;
+    }
+    setServerError(null);
+    verifyOtpMutation.mutate({
+      name: userData.name,
+      email: userData.email,
+      password: userData.password,
+      otp: otpValue,
+    });
+  };
+
   const onSubmit = async (data: FormData) => {
-    // login logic
+    setServerError(null);
+    signupMutation.mutate(data);
+  };
+
+  const resendOtp = () => {
+    if (!userData || !canResend || signupMutation.isPending) return;
+    setServerError(null);
+    signupMutation.mutate(userData);
   };
 
   return (
@@ -113,6 +209,12 @@ const RegisterPage = () => {
             or Sign in with Email
           </span>
         </div>
+
+        {serverError && (
+          <div className="mb-4 p-2.5 rounded-md bg-red-50 border border-red-200 text-red-600 text-xs">
+            {serverError}
+          </div>
+        )}
 
         {!showOtp ? (
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
@@ -225,9 +327,31 @@ const RegisterPage = () => {
 
             <button
               type="submit"
-              className="w-full py-2.5 bg-black hover:bg-neutral-800 text-white font-medium text-xs rounded-md transition-colors cursor-pointer mt-2"
+              disabled={signupMutation.isPending}
+              className="w-full py-2.5 bg-black hover:bg-neutral-800 disabled:bg-gray-400 text-white font-medium text-xs rounded-md transition-colors cursor-pointer disabled:cursor-not-allowed mt-2 flex items-center justify-center gap-2"
             >
-              Sign up
+              {signupMutation.isPending && (
+                <svg
+                  className="w-4 h-4 animate-spin text-white"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                >
+                  <circle
+                    className="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    strokeWidth="4"
+                  />
+                  <path
+                    className="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
+                  />
+                </svg>
+              )}
+              <span>{signupMutation.isPending ? 'Signing up...' : 'Sign up'}</span>
             </button>
           </form>
         ) : (
@@ -262,22 +386,55 @@ const RegisterPage = () => {
 
             <button
               type="button"
-              className="w-full py-2.5 bg-black hover:bg-neutral-800 text-white font-medium text-xs rounded-md transition-colors cursor-pointer"
+              onClick={verifyOtpCode}
+              disabled={verifyOtpMutation.isPending}
+              className="w-full py-2.5 bg-black hover:bg-neutral-800 disabled:bg-gray-400 text-white font-medium text-xs rounded-md transition-colors cursor-pointer disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
-              Verify OTP
+              {verifyOtpMutation.isPending && (
+                <svg
+                  className="w-4 h-4 animate-spin text-white"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                >
+                  <circle
+                    className="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    strokeWidth="4"
+                  />
+                  <path
+                    className="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
+                  />
+                </svg>
+              )}
+              <span>
+                {verifyOtpMutation.isPending ? 'Verifying...' : 'Verify OTP'}
+              </span>
             </button>
 
-            <div className="text-center mt-4">
-              <span className="text-xs text-gray-500">
-                Didn&apos;t receive code?{' '}
-              </span>
-              <button
-                type="button"
-                className="text-xs text-blue-600 hover:underline font-medium cursor-pointer"
-              >
-                Resend OTP
-              </button>
-            </div>
+            {canResend ? (
+              <div className="text-center mt-4">
+                <span className="text-xs text-gray-500">
+                  Didn&apos;t receive code?{' '}
+                </span>
+                <button
+                  type="button"
+                  onClick={resendOtp}
+                  disabled={signupMutation.isPending}
+                  className="text-xs text-blue-600 hover:underline font-medium cursor-pointer disabled:text-gray-400"
+                >
+                  {signupMutation.isPending ? 'Resending...' : 'Resend OTP'}
+                </button>
+              </div>
+            ) : (
+              <p className="text-center my-3 text-xs text-gray-500">
+                {`Resend otp in ${timer} seconds`}
+              </p>
+            )}
           </div>
         )}
       </div>
