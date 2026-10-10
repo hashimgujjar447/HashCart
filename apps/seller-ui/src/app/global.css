@@ -1,0 +1,19 @@
+@import "tailwindcss";
+
+@theme {
+  --font-roboto: var(--font-roboto), sans-serif;
+  --font-poppins: var(--font-poppins), sans-serif;
+}
+
+.PhoneInputCountry {
+  margin-right: 0.5rem;
+}
+
+.PhoneInputInput {
+  background: transparent !important;
+  outline: none !important;
+  font-size: 0.75rem !important;
+  color: #1f2937 !important;
+  width: 100% !important;
+}
+

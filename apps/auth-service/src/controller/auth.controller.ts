@@ -277,3 +277,141 @@ export const getUser = async (
     return next(error);
   }
 };
+
+// register seller
+
+export const registerSeller = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    validateRegistrationData(req.body, 'seller');
+    const { name, email } = req.body;
+    const existingSeller = await prisma.sellers.findUnique({
+      where: { email },
+    });
+
+    if (existingSeller) {
+      throw new ValidationError('Seller already exists with this email');
+    }
+
+    await checkOtpValidation(email);
+    await trackOtpRequests(email);
+    await sendOtp(name, email, 'seller-activation-mail');
+
+    return res.status(200).json({
+      message: 'OTP sent to email. Please verify your account.',
+    });
+  } catch (error) {
+    return next(error);
+  }
+};
+
+// verify seller account
+export const verifySellerAccount = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const { email, otp, password, name, phone_number, country } = req.body;
+    if (!email || !otp) {
+      return next(new ValidationError('Email and OTP are required'));
+    }
+
+    const isExistingUser = await prisma.users.findUnique({ where: { email } });
+
+    if (isExistingUser) {
+      return next(new ValidationError('User already exist with this email!'));
+    }
+
+    if (otp.length !== 4) {
+      return next(new ValidationError('OTP must be 4 digits long'));
+    }
+
+    await verifyOtp(email, otp);
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    const user = await prisma.sellers.create({
+      data: {
+        name,
+        email,
+        password: hashedPassword,
+        phone_number: phone_number,
+        country: country,
+      },
+    });
+
+    return res.status(201).json({
+      message: 'Seller account verified and created successfully',
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+      },
+    });
+  } catch (error) {
+    return next(error);
+  }
+};
+
+// create shop for seller
+export const createShop = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const {
+      name,
+      bio,
+      address,
+      opening_hours,
+      sellerId,
+      website,
+      category,
+      socialLinks,
+    } = req.body;
+
+    if (!name || !bio || !address || !opening_hours || !sellerId || !category) {
+      return next(new ValidationError('All fields are required'));
+    }
+
+    const isCorrectSeller = await prisma.sellers.findUnique({
+      where: { id: sellerId },
+    });
+
+    if (!isCorrectSeller) {
+      return next(new ValidationError('Seller not found'));
+    }
+
+    const shopData: any = {
+      name,
+      bio,
+      address,
+      opening_hours,
+      category,
+      sellerId,
+    };
+
+    if (website && website.trim() !== '') {
+      shopData['website'] = website;
+    }
+
+    if (socialLinks && Array.isArray(socialLinks)) {
+      shopData['socialLinks'] = socialLinks;
+    }
+
+    const shop = await prisma.shops.create({
+      data: shopData,
+    });
+    return res.status(201).json({
+      message: 'Shop created successfully',
+      shop,
+    });
+  } catch (error) {
+    return next(error);
+  }
+};
