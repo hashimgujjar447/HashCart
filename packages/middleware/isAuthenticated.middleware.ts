@@ -23,23 +23,51 @@ export const isAuthenticated = async (
     if (!decoded) {
       return res.status(401).json({ message: 'Unauthorized: Invalid token' });
     }
-    const account = await prisma.users.findUnique({
-      where: { id: decoded.userId },
-      select: {
-        id: true,
-        email: true,
-        name: true,
-        following: true,
-        createdAt: true,
-        updatedAt: true,
-      },
-    });
 
-    req.user = account;
+    if (decoded.role === 'user') {
+      const user = await prisma.users.findUnique({
+        where: { id: decoded.userId },
+        select: {
+          id: true,
+          email: true,
+          name: true,
+          following: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      });
+      req.user = user;
 
-    if (!account) {
-      return res.status(401).json({ message: 'Unauthorized: User not found' });
+      if (!user)
+        return res
+          .status(401)
+          .json({ message: 'Unauthorized: User not found' });
+    } else {
+      const seller = await prisma.sellers.findUnique({
+        where: { id: decoded.userId },
+        select: {
+          id: true,
+          email: true,
+          name: true,
+          phone_number: true, // ← add
+          country: true, // ← add
+          stripeId: true, // ← add
+          createdAt: true,
+          updatedAt: true,
+          shop: true,
+        },
+      });
+      req.seller = seller;
+
+      if (!seller)
+        return res
+          .status(401)
+          .json({ message: 'Unauthorized: User not found' });
     }
+
+
+
+    req.role = decoded.role as 'user' | 'seller';
 
     next();
   } catch (error: any) {
