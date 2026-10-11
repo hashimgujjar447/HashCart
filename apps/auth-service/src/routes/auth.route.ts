@@ -11,6 +11,7 @@ import {
   registerSeller,
   verifySellerAccount,
   createShop,
+  createStripeConnectAccountLink,
 } from '../controller/auth.controller';
 import { isAuthenticated } from '../../../../packages/middleware/isAuthenticated.middleware';
 
@@ -30,6 +31,10 @@ router.get('/logged-in-user', isAuthenticated, getUser);
 
 router.post('/register-seller', registerSeller);
 router.post('/verify-seller', verifySellerAccount);
-router.post('/create-shop', isAuthenticated, createShop);
+router.post('/create-shop', createShop);
+router.post(
+  '/create-stripe-connect-account-link',
+  createStripeConnectAccountLink,
+);
 
 export default router;

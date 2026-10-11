@@ -65,7 +65,7 @@ type ApiErrorResponse = {
 };
 
 const RegisterPage = () => {
-  const [activeState, setActiveState] = useState(3);
+  const [activeState, setActiveState] = useState(1);
   const [passwordVisible, setPasswordVisible] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
@@ -242,11 +242,11 @@ const RegisterPage = () => {
   const connectStripe = async () => {
     try {
       const response = await axios.post(
-        `${process.env.NEXT_PUBLIC_SERVER_URL}/auth/create-stripe-link`,
+        `${process.env.NEXT_PUBLIC_SERVER_URL}/auth/create-stripe-connect-account-link`,
         { sellerId: sellerId },
       );
-      if (response.data && response.data.url) {
-        window.location.href = response.data.url;
+      if (response.data?.accountLink?.url) {
+        window.location.href = response.data.accountLink.url;
       }
     } catch (error) {
       console.error('Error connecting to Stripe:', error);

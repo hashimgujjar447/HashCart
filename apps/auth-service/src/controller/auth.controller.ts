@@ -461,13 +461,29 @@ export const createStripeConnectAccountLink = async (
       return next(new ValidationError('Seller not found'));
     }
 
-    const account = await stripe.accounts.create({
-      type: 'express',
-      email: seller.email,
-      country: 'GB',
-      capabilities: {
-        card_payments: { requested: true },
-        transfers: { requested: true },
+    const account = await stripe.v2.core.accounts.create({
+      contact_email: seller.email,
+      identity: { country: 'GB' },
+      dashboard: 'express',
+      defaults: {
+        responsibilities: {
+          fees_collector: 'application',
+          losses_collector: 'application',
+        },
+      },
+      configuration: {
+        merchant: {
+          capabilities: {
+            card_payments: { requested: true },
+          },
+        },
+        recipient: {
+          capabilities: {
+            stripe_balance: {
+              stripe_transfers: { requested: true },
+            },
+          },
+        },
       },
     });
 
