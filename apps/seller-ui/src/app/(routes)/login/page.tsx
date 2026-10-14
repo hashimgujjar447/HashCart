@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { useMutation } from '@tanstack/react-query';
-import axios from 'axios';
+import axiosInstance from '@/app/utils/axiosInstance';
 
 type FormData = {
   email: string;
@@ -21,8 +21,8 @@ const LoginPage = () => {
 
   const loginMutation = useMutation({
     mutationFn: async (data: FormData) => {
-      const response = await axios.post(
-        `${process.env.NEXT_PUBLIC_SERVER_URL}/auth/login`,
+      const response = await axiosInstance.post(
+        '/auth/login-seller',
         data,
       );
       return response.data;
@@ -30,7 +30,7 @@ const LoginPage = () => {
     onSuccess: (data) => {
       console.log('User logged in successfully:', data);
       setServerError(null); // Clear any previous error
-      router.push('/');
+      router.push('/dashboard');
     },
     onError: (error: any) => {
       console.error(

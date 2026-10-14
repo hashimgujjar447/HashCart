@@ -129,9 +129,15 @@ export const loginUser = async (
       { expiresIn: '7d' },
     );
 
+    // Clear previous cookies first
+    res.clearCookie('sellerAccessToken');
+    res.clearCookie('sellerRefreshToken');
+    res.clearCookie('accessToken');
+    res.clearCookie('refreshToken');
+
+    // Set new user cookies
     setCookie(res, 'accessToken', accessToken);
     setCookie(res, 'refreshToken', refreshToken);
-
     res.status(200).json({
       message: 'User logged in successfully',
       user: {
@@ -230,16 +236,18 @@ export const refreshToken = async (
   try {
     // Support both user and seller refresh tokens
     const token = req.cookies.refreshToken || req.cookies.sellerRefreshToken;
-    const isSeller = !!req.cookies.sellerRefreshToken && !req.cookies.refreshToken;
+    const isSeller =
+      !!req.cookies.sellerRefreshToken && !req.cookies.refreshToken;
 
     if (!token) {
       return next(new ValidationError('Refresh token is required'));
     }
 
-    const decoded = jwt.verify(
-      token,
-      process.env.REFRESH_TOKEN_SECRET!,
-    ) as { userId: string; email: string; role: string };
+    const decoded = jwt.verify(token, process.env.REFRESH_TOKEN_SECRET!) as {
+      userId: string;
+      email: string;
+      role: string;
+    };
 
     if (!decoded || !decoded.userId || !decoded.email) {
       return next(new JsonWebTokenError('Invalid refresh token'));
@@ -547,16 +555,23 @@ export const loginSeller = async (
       { expiresIn: '7d' },
     );
 
+    res.clearCookie('accessToken');
+    res.clearCookie('refreshToken');
+    res.clearCookie('sellerAccessToken');
+    res.clearCookie('sellerRefreshToken');
+
     setCookie(res, 'sellerAccessToken', accessToken);
     setCookie(res, 'sellerRefreshToken', refreshToken);
 
     res.status(200).json({
       message: 'Seller logged in successfully',
-      user: {
+      seller: {
         id: user.id,
         name: user.name,
         email: user.email,
       },
+      sellerAccessToken: accessToken,
+      sellerRefreshToken: refreshToken,
     });
   } catch (error) {
     return next(error);
@@ -570,9 +585,73 @@ export const getSeller = async (
 ) => {
   try {
     const seller = req.seller;
+    console.log(seller);
     res.status(200).json({
       message: 'Seller fetched successfully',
       seller,
+    });
+  } catch (error) {
+    return next(error);
+  }
+};
+
+// seller forget password request
+export const sellerForgetPassword = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  await handleForgetPassword(req, res, next, 'seller');
+};
+
+// reset seller password request function
+export const resetSellerPassword = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const { email, newPassword } = req.body;
+
+    if (!email || !newPassword) {
+      return next(new ValidationError('Email and new password are required'));
+    }
+
+    const isVerified = await redisClient.get(
+      `password_reset_verified:${email}`,
+    );
+    if (!isVerified) {
+      return next(
+        new ValidationError(
+          'Please verify the OTP before resetting your password',
+        ),
+      );
+    }
+
+    const seller = await prisma.sellers.findUnique({ where: { email } });
+    if (!seller) {
+      return next(new ValidationError('Seller not found'));
+    }
+
+    if (seller.password) {
+      const isSamePassword = await bcrypt.compare(newPassword, seller.password);
+      if (isSamePassword) {
+        return next(
+          new ValidationError('New password cannot be the same as the old one'),
+        );
+      }
+    }
+
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    await prisma.sellers.update({
+      where: { email },
+      data: { password: hashedPassword },
+    });
+
+    await redisClient.del(`password_reset_verified:${email}`);
+
+    res.status(200).json({
+      message: 'Password reset successfully',
     });
   } catch (error) {
     return next(error);

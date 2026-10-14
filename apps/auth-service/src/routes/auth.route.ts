@@ -12,6 +12,10 @@ import {
   verifySellerAccount,
   createShop,
   createStripeConnectAccountLink,
+  loginSeller,
+  getSeller,
+  sellerForgetPassword,
+  resetSellerPassword,
 } from '../controller/auth.controller';
 import { isAuthenticated } from '../../../../packages/middleware/isAuthenticated.middleware';
 
@@ -23,11 +27,14 @@ router.post('/login', loginUser);
 router.post('/forgot-password', userForgetPassword);
 router.post('/verify-forgot-password-otp', verifyForgetPasswordOtp);
 router.post('/reset-password', resetUserPassword);
-router.post('/refresh-token-user', refreshToken);
+router.post('/refresh-token', refreshToken);
 
 router.get('/logged-in-user', isAuthenticated, getUser);
 
 // seller routes
+
+router.post('/login-seller', loginSeller);
+router.get('/logged-in-seller', isAuthenticated, getSeller);
 
 router.post('/register-seller', registerSeller);
 router.post('/verify-seller', verifySellerAccount);
@@ -36,5 +43,9 @@ router.post(
   '/create-stripe-connect-account-link',
   createStripeConnectAccountLink,
 );
+router.post('/forgot-password-seller', sellerForgetPassword);
+router.post('/reset-password-seller', resetSellerPassword);
+router.post('/seller-forgot-password', sellerForgetPassword);
+router.post('/seller-reset-password', resetSellerPassword);
 
 export default router;

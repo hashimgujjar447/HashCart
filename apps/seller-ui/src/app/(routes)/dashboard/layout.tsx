@@ -3,15 +3,15 @@ import React from 'react';
 
 const Layout = ({ children }: { children: React.ReactNode }) => {
   return (
-    <div className="flex h-full bg-black min-h-screen">
-      <aside className="w-[280px] p-4 min-w-[250px] border-r border-r-slate-800 text-white p-4s">
-        <div className="sticky top-0 ">
+    <div className="flex min-h-screen bg-black text-white">
+      <aside className="w-[260px] min-w-[260px] border-r border-[#1a1f2c] bg-black">
+        <div className="sticky top-0 h-screen">
           <SidebarBarWrapper />
         </div>
       </aside>
 
-      <main className="flex-1 p-4 text-white">
-        <div className="overflow-auto"> {children}</div>
+      <main className="flex-1 p-6 text-white overflow-y-auto">
+        {children}
       </main>
     </div>
   );

@@ -7,12 +7,13 @@ import rateLimit from 'express-rate-limit';
 import { errorMiddleware } from '../../../packages/error-handler/error-middleware';
 import cookieParser from 'cookie-parser';
 import { connectRedis } from '../../../packages/redis/redis';
+import { initializeSiteConfig } from './lib/initializeSiteConfig';
 
 const app = express();
 
 app.use(
   cors({
-    origin: ['http://localhost:3000'],
+    origin: ['http://localhost:3000', 'http://localhost:3001', 'http://localhost:3002'],
     allowedHeaders: ['Authorization', 'Content-Type'],
     credentials: true,
   }),
@@ -55,7 +56,13 @@ const startServer = async () => {
     console.log('Connected to Redis');
 
     const server = app.listen(port, () => {
-      console.log(`Listening at http://localhost:${port}`);
+      console.log(`Listening at http://localhost:${port}/api`);
+      try {
+        initializeSiteConfig();
+        console.log('Site config initialized successfully');
+      } catch (error) {
+        console.error('Failed to initialize site config:', error);
+      }
     });
 
     server.on('error', console.error);

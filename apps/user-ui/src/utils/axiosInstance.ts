@@ -57,7 +57,7 @@ axiosInstance.interceptors.response.use(
       originalRequest._retry = true;
       refreshing = true;
 
-      const refreshUrl = `${process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:8080'}/auth/refresh-token-user`;
+      const refreshUrl = `${process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:8080'}/auth/refresh-token`;
       console.log('[Axios] Attempting to refresh token at:', refreshUrl);
 
       try {

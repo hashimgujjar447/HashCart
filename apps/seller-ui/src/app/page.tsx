@@ -1,3 +1,4 @@
+'use client';
 export default function Index() {
   return (
     <div className="w-full min-h-screen bg-gray-50 flex items-center justify-center p-6 font-poppins">
@@ -12,6 +13,20 @@ export default function Index() {
           <button
             type="button"
             className="w-full py-2.5 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-semibold transition-colors cursor-pointer shadow-xs"
+            onClick={() => {
+              window.location.href = '/login';
+            }}
+          >
+            Go to Seller Login
+          </button>
+        </div>
+        <div className="mt-4">
+          <button
+            type="button"
+            className="w-full py-2.5 px-4 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-semibold transition-colors cursor-pointer shadow-xs"
+            onClick={() => {
+              window.location.href = '/dashboard';
+            }}
           >
             Go to Seller Dashboard
           </button>

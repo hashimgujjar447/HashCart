@@ -2,7 +2,9 @@ import { useQuery } from '@tanstack/react-query';
 import axiosInstance from '@/utils/axiosInstance';
 
 const fetchUser = async () => {
-  const response = await axiosInstance.get('/auth/logged-in-user');
+  const response = await axiosInstance.get('/auth/logged-in-user', {
+    withCredentials: true,
+  });
   return response.data.user;
 };
 

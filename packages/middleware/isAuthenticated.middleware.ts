@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import prisma from '../libs/prisma/index.js';
+
 export const isAuthenticated = async (
   req: Request,
   res: Response,
@@ -8,7 +9,9 @@ export const isAuthenticated = async (
 ) => {
   try {
     const token =
-      req.cookies.accessToken || req?.headers?.authorization?.split(' ')[1];
+      req.cookies['accessToken'] ||
+      req.cookies['sellerAccessToken'] ||
+      req?.headers?.authorization?.split(' ')[1];
 
     if (!token) {
       return res
@@ -49,9 +52,9 @@ export const isAuthenticated = async (
           id: true,
           email: true,
           name: true,
-          phone_number: true, // ← add
-          country: true, // ← add
-          stripeId: true, // ← add
+          phone_number: true,
+          country: true,
+          stripeId: true,
           createdAt: true,
           updatedAt: true,
           shop: true,
@@ -64,8 +67,6 @@ export const isAuthenticated = async (
           .status(401)
           .json({ message: 'Unauthorized: User not found' });
     }
-
-
 
     req.role = decoded.role as 'user' | 'seller';
 
