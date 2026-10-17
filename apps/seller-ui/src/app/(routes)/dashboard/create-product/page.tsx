@@ -285,10 +285,16 @@ const CreateProductPage = () => {
                 <option value="Fashion" className="bg-[#11141a] text-white">
                   Fashion
                 </option>
-                <option value="Home & Kitchen" className="bg-[#11141a] text-white">
+                <option
+                  value="Home & Kitchen"
+                  className="bg-[#11141a] text-white"
+                >
                   Home & Kitchen
                 </option>
-                <option value="Sports & Fitness" className="bg-[#11141a] text-white">
+                <option
+                  value="Sports & Fitness"
+                  className="bg-[#11141a] text-white"
+                >
                   Sports & Fitness
                 </option>
               </select>

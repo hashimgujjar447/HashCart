@@ -13,7 +13,11 @@ const app = express();
 
 app.use(
   cors({
-    origin: ['http://localhost:3000', 'http://localhost:3001', 'http://localhost:3002'],
+    origin: [
+      'http://localhost:3000',
+      'http://localhost:3001',
+      'http://localhost:3002',
+    ],
     allowedHeaders: ['Authorization', 'Content-Type'],
     credentials: true,
   }),
@@ -44,6 +48,7 @@ app.get('/api-gateway-health', (req, res) => {
 });
 
 app.use('/auth', proxy('http://localhost:6001'));
+app.use('/product', proxy('http://localhost:6002'));
 
 app.use(errorMiddleware);
 
