@@ -33,6 +33,8 @@
     "src/**/*.jsx",
     "../../packages/components/input/**/*.ts",
     "../../packages/components/input/**/*.tsx",
+    "../../packages/rich-text-editor/**/*.ts",
+    "../../packages/rich-text-editor/**/*.tsx",
     "../../apps/seller-ui/.next/types/**/*.ts",
     "../../dist/apps/seller-ui/.next/types/**/*.ts",
     "index.d.ts",

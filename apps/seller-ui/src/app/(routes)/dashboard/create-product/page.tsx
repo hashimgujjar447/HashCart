@@ -5,17 +5,46 @@ import Link from 'next/link';
 import { ChevronRight, Plus, PlusCircle, Trash2, X } from 'lucide-react';
 import ImagePlaceholder from '@/app/shared/components/image-placeholder';
 import Input from '@packages/components/input';
+import RichTextEditor from '@packages/rich-text-editor';
+import { useQuery } from '@tanstack/react-query';
+import axiosInstance from '@/app/utils/axiosInstance';
+
+const SIZES = ['XS', 'S', 'M', 'L', 'XL', 'XXL', '3XL'];
+
+interface DiscountCode {
+  id: string;
+  public_name: string;
+  discountType: string;
+  discountValue: number;
+  discountCode: string;
+  sellerId: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+const selectClass =
+  'w-full bg-[#11141a] border border-[#2b3342] text-gray-200 text-sm rounded-lg p-2.5 focus:border-blue-500 focus:outline-none cursor-pointer';
+
+const labelClass = 'block mb-2 text-sm font-medium text-gray-200';
 
 const CreateProductPage = () => {
   const [images, setImages] = useState<(File | null)[]>([null]);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
+  const [detailedDescription, setDetailedDescription] = useState('');
   const [tags, setTags] = useState('');
   const [warranty, setWarranty] = useState('');
   const [slug, setSlug] = useState('');
   const [brand, setBrand] = useState('');
   const [cashOnDelivery, setCashOnDelivery] = useState('yes');
   const [category, setCategory] = useState('');
+  const [subCategory, setSubCategory] = useState('');
+  const [videoUrl, setVideoUrl] = useState('');
+  const [regularPrice, setRegularPrice] = useState('');
+  const [salePrice, setSalePrice] = useState('');
+  const [stock, setStock] = useState('');
+  const [selectedSizes, setSelectedSizes] = useState<string[]>([]);
+  const [discountCode, setDiscountCode] = useState('');
 
   const [availableColors, setAvailableColors] = useState<string[]>([
     '#ffffff',
@@ -42,32 +71,49 @@ const CreateProductPage = () => {
     [key: number]: string;
   }>({});
 
+  const { data, isError } = useQuery({
+    queryKey: ['categories'],
+    queryFn: async () => {
+      const response = await axiosInstance.get('/product/get-categories');
+      return response.data;
+    },
+    staleTime: 5 * 60 * 1000,
+    retry: 1,
+  });
+
+  const { data: allDiscountCodes = [], isLoading } = useQuery<DiscountCode[]>({
+    queryKey: ['shop-discount-codes'],
+    queryFn: async () => {
+      const response = await axiosInstance.get('/product/get-discount-codes');
+      return response.data?.discount_codes || [];
+    },
+    staleTime: 5 * 60 * 1000,
+    retry: 1,
+  });
+
+  const categories = data?.categories || [];
+  const subCategories = data?.subCategories || {};
+
   const handleImageChange = (file: File | null, index: number) => {
     const updatedImages = [...images];
     updatedImages[index] = file;
-
     if (index === images.length - 1 && images.length < 8 && file) {
       updatedImages.push(null);
     }
-
     setImages(updatedImages);
   };
 
   const handleImageRemove = (index: number) => {
     const updatedImages = [...images];
     updatedImages.splice(index, 1);
-    if (updatedImages.length === 0) {
-      updatedImages.push(null);
-    }
+    if (updatedImages.length === 0) updatedImages.push(null);
     setImages(updatedImages);
   };
 
   const toggleColor = (color: string) => {
-    if (selectedColors.includes(color)) {
-      setSelectedColors(selectedColors.filter((c) => c !== color));
-    } else {
-      setSelectedColors([...selectedColors, color]);
-    }
+    setSelectedColors((prev) =>
+      prev.includes(color) ? prev.filter((c) => c !== color) : [...prev, color],
+    );
   };
 
   const addCustomColor = () => {
@@ -78,6 +124,12 @@ const CreateProductPage = () => {
       setSelectedColors([...selectedColors, pickerColor]);
     }
     setShowColorPicker(false);
+  };
+
+  const toggleSize = (size: string) => {
+    setSelectedSizes((prev) =>
+      prev.includes(size) ? prev.filter((s) => s !== size) : [...prev, size],
+    );
   };
 
   const addSpecification = () => {
@@ -136,27 +188,41 @@ const CreateProductPage = () => {
     setCustomProperties(updated);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const buildPayload = () => ({
+    title,
+    description,
+    detailedDescription,
+    tags,
+    warranty,
+    slug,
+    brand,
+    cashOnDelivery,
+    category,
+    subCategory,
+    videoUrl,
+    regularPrice,
+    salePrice,
+    stock,
+    sizes: selectedSizes,
+    discountCode,
+    colors: selectedColors,
+    specifications: specifications.filter((s) => s.name || s.value),
+    customProperties,
+    images: images.filter((img) => img !== null),
+  });
+
+  const handleSaveDraft = (e: React.FormEvent) => {
     e.preventDefault();
-    const productPayload = {
-      title,
-      description,
-      tags,
-      warranty,
-      slug,
-      brand,
-      cashOnDelivery,
-      category,
-      colors: selectedColors,
-      specifications: specifications.filter((s) => s.name || s.value),
-      customProperties,
-      images: images.filter((img) => img !== null),
-    };
-    console.log('Submitting Product Data:', productPayload);
+    console.log('Save Draft:', buildPayload());
+  };
+
+  const handleCreate = (e: React.FormEvent) => {
+    e.preventDefault();
+    console.log('Create Product:', buildPayload());
   };
 
   return (
-    <div className="w-full max-w-7xl mx-auto py-2 text-white font-poppins">
+    <div className="w-full max-w-[1600px] mx-auto py-2 text-white font-poppins">
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-white tracking-tight mb-1">
           Create Product
@@ -170,9 +236,10 @@ const CreateProductPage = () => {
         </div>
       </div>
 
-      <form onSubmit={handleSubmit} className="w-full pb-16">
-        <div className="flex flex-col lg:flex-row gap-8 w-full items-start">
-          <div className="w-full lg:w-[380px] shrink-0">
+      <form className="w-full pb-16">
+        <div className="grid grid-cols-1 lg:grid-cols-[260px_1fr_1fr] gap-6 w-full items-start">
+          {/* ── Column 1: Images ── */}
+          <div className="w-full">
             <ImagePlaceholder
               setOpenImageModel={() => {}}
               size="765 x 850"
@@ -181,9 +248,8 @@ const CreateProductPage = () => {
               onImageChange={handleImageChange}
               onImageRemove={handleImageRemove}
             />
-
             {images.length > 1 && (
-              <div className="grid grid-cols-3 gap-3 mt-4">
+              <div className="grid grid-cols-3 gap-2 mt-3">
                 {images.slice(1).map((_, index) => (
                   <ImagePlaceholder
                     key={index + 1}
@@ -199,7 +265,8 @@ const CreateProductPage = () => {
             )}
           </div>
 
-          <div className="flex-1 w-full max-w-2xl space-y-5">
+          {/* ── Column 2: Basic Info ── */}
+          <div className="space-y-5 min-w-0">
             <Input
               label="Product Title *"
               placeholder="Enter product title"
@@ -249,61 +316,9 @@ const CreateProductPage = () => {
               onChange={(e: any) => setBrand(e.target.value)}
             />
 
+            {/* Colors */}
             <div>
-              <label className="block mb-2 text-sm font-medium text-gray-200">
-                Cash on Delivery *
-              </label>
-              <select
-                value={cashOnDelivery}
-                onChange={(e) => setCashOnDelivery(e.target.value)}
-                className="w-full bg-[#11141a] border border-[#2b3342] text-gray-200 text-sm rounded-lg p-2.5 focus:border-blue-500 focus:outline-none cursor-pointer"
-              >
-                <option value="yes" className="bg-[#11141a] text-white">
-                  Yes
-                </option>
-                <option value="no" className="bg-[#11141a] text-white">
-                  No
-                </option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block mb-2 text-sm font-medium text-gray-200">
-                Category *
-              </label>
-              <select
-                value={category}
-                onChange={(e) => setCategory(e.target.value)}
-                className="w-full bg-[#11141a] border border-[#2b3342] text-gray-200 text-sm rounded-lg p-2.5 focus:border-blue-500 focus:outline-none cursor-pointer"
-              >
-                <option value="" className="bg-[#11141a] text-gray-500">
-                  Select Category
-                </option>
-                <option value="Electronics" className="bg-[#11141a] text-white">
-                  Electronics
-                </option>
-                <option value="Fashion" className="bg-[#11141a] text-white">
-                  Fashion
-                </option>
-                <option
-                  value="Home & Kitchen"
-                  className="bg-[#11141a] text-white"
-                >
-                  Home & Kitchen
-                </option>
-                <option
-                  value="Sports & Fitness"
-                  className="bg-[#11141a] text-white"
-                >
-                  Sports & Fitness
-                </option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block mb-2 text-sm font-medium text-gray-200">
-                Colors
-              </label>
+              <label className={labelClass}>Colors</label>
               <div className="flex items-center gap-2.5 flex-wrap">
                 {availableColors.map((color) => {
                   const isSelected = selectedColors.includes(color);
@@ -321,7 +336,6 @@ const CreateProductPage = () => {
                     />
                   );
                 })}
-
                 <button
                   type="button"
                   onClick={() => setShowColorPicker(!showColorPicker)}
@@ -331,7 +345,6 @@ const CreateProductPage = () => {
                   <Plus className="w-4 h-4" />
                 </button>
               </div>
-
               {showColorPicker && (
                 <div className="flex items-center gap-2.5 mt-3">
                   <div className="relative w-8 h-8 rounded border border-gray-400 overflow-hidden">
@@ -353,19 +366,18 @@ const CreateProductPage = () => {
               )}
             </div>
 
+            {/* Custom Specifications */}
             <div className="pt-2">
-              <label className="block text-sm font-medium text-gray-200 mb-2">
+              <label className={`${labelClass} mb-2`}>
                 Custom Specifications
               </label>
-
               {specifications.length > 0 && (
                 <div className="grid grid-cols-[1fr_1fr_auto] gap-3 text-xs text-gray-400 mb-1 px-1">
                   <span>Specification Name</span>
                   <span>Value</span>
-                  <span className="w-8"></span>
+                  <span className="w-8" />
                 </div>
               )}
-
               <div className="space-y-2.5">
                 {specifications.map((spec, index) => (
                   <div
@@ -374,7 +386,7 @@ const CreateProductPage = () => {
                   >
                     <input
                       type="text"
-                      placeholder="e.g., Battery Life, Weight"
+                      placeholder="e.g., Battery Life"
                       value={spec.name}
                       onChange={(e) =>
                         updateSpecification(index, 'name', e.target.value)
@@ -383,7 +395,7 @@ const CreateProductPage = () => {
                     />
                     <input
                       type="text"
-                      placeholder="e.g., 4000mAh, 1.5kg, Pl"
+                      placeholder="e.g., 4000mAh"
                       value={spec.value}
                       onChange={(e) =>
                         updateSpecification(index, 'value', e.target.value)
@@ -394,14 +406,12 @@ const CreateProductPage = () => {
                       type="button"
                       onClick={() => removeSpecification(index)}
                       className="w-8 h-8 flex items-center justify-center text-red-500 hover:text-red-400 cursor-pointer"
-                      title="Remove specification"
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
                   </div>
                 ))}
               </div>
-
               <button
                 type="button"
                 onClick={addSpecification}
@@ -412,11 +422,9 @@ const CreateProductPage = () => {
               </button>
             </div>
 
+            {/* Custom Properties */}
             <div className="pt-2">
-              <label className="block text-sm font-medium text-gray-200 mb-2">
-                Custom Properties
-              </label>
-
+              <label className={labelClass}>Custom Properties</label>
               <div className="space-y-3 mb-3">
                 {customProperties.map((prop, propIndex) => (
                   <div
@@ -431,12 +439,10 @@ const CreateProductPage = () => {
                         type="button"
                         onClick={() => removeCustomProperty(propIndex)}
                         className="text-red-500 hover:text-red-400 cursor-pointer"
-                        title="Remove property"
                       >
                         <X className="w-4 h-4" />
                       </button>
                     </div>
-
                     <div className="flex gap-2 mb-3">
                       <input
                         type="text"
@@ -464,7 +470,6 @@ const CreateProductPage = () => {
                         Add
                       </button>
                     </div>
-
                     {prop.values.length > 0 && (
                       <div className="flex flex-wrap gap-2">
                         {prop.values.map((val, valIndex) => (
@@ -489,11 +494,10 @@ const CreateProductPage = () => {
                   </div>
                 ))}
               </div>
-
               <div className="flex gap-2">
                 <input
                   type="text"
-                  placeholder="Enter property label (e.g., Material, Warranty)"
+                  placeholder="Enter property label (e.g., Material)"
                   value={newPropertyLabel}
                   onChange={(e) => setNewPropertyLabel(e.target.value)}
                   onKeyDown={(e) => {
@@ -515,12 +519,185 @@ const CreateProductPage = () => {
               </div>
             </div>
 
-            <div className="pt-6">
-              <button
-                type="submit"
-                className="w-full py-3 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-medium text-sm rounded-lg transition-colors cursor-pointer shadow-lg"
+            {/* Cash on Delivery */}
+            <div>
+              <label className={labelClass}>Cash on Delivery *</label>
+              <select
+                value={cashOnDelivery}
+                onChange={(e) => setCashOnDelivery(e.target.value)}
+                className={selectClass}
               >
-                Create Product
+                <option value="yes" className="bg-[#11141a]">
+                  Yes
+                </option>
+                <option value="no" className="bg-[#11141a]">
+                  No
+                </option>
+              </select>
+            </div>
+          </div>
+
+          {/* ── Column 3: Category, Description, Pricing ── */}
+          <div className="space-y-5 min-w-0">
+            {/* Category */}
+            <div>
+              <label className={labelClass}>Category *</label>
+              {isError ? (
+                <p className="text-red-400 text-xs mb-2">
+                  Failed to load categories
+                </p>
+              ) : null}
+              <select
+                value={category}
+                onChange={(e) => {
+                  setCategory(e.target.value);
+                  setSubCategory('');
+                }}
+                className={selectClass}
+              >
+                <option value="" className="bg-[#11141a] text-gray-500">
+                  Select Category
+                </option>
+                {categories.map((cat: string) => (
+                  <option key={cat} value={cat} className="bg-[#11141a]">
+                    {cat}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Subcategory */}
+            <div>
+              <label className={labelClass}>Subcategory *</label>
+              <select
+                value={subCategory}
+                onChange={(e) => setSubCategory(e.target.value)}
+                className={selectClass}
+                disabled={!category}
+              >
+                <option value="" className="bg-[#11141a] text-gray-500">
+                  Select Subcategory
+                </option>
+                {(subCategories[category] || []).map((sub: string) => (
+                  <option key={sub} value={sub} className="bg-[#11141a]">
+                    {sub}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Detailed Description — Rich Text Editor */}
+            <RichTextEditor
+              label="Detailed Description * (Min 100 words)"
+              value={detailedDescription}
+              onChange={setDetailedDescription}
+              placeholder="Write a detailed product description here..."
+            />
+
+            {/* Video URL */}
+            <Input
+              label="Video URL"
+              placeholder="https://www.youtube.com/embed/xyz123"
+              value={videoUrl}
+              onChange={(e: any) => setVideoUrl(e.target.value)}
+            />
+
+            {/* Regular Price */}
+            <Input
+              label="Regular Price"
+              placeholder="20$"
+              value={regularPrice}
+              onChange={(e: any) => setRegularPrice(e.target.value)}
+            />
+
+            {/* Sale Price */}
+            <Input
+              label="Sale Price *"
+              placeholder="15$"
+              value={salePrice}
+              onChange={(e: any) => setSalePrice(e.target.value)}
+              required
+            />
+
+            {/* Stock */}
+            <Input
+              label="Stock *"
+              placeholder="100"
+              value={stock}
+              onChange={(e: any) => setStock(e.target.value)}
+              required
+            />
+
+            {/* Sizes */}
+            <div>
+              <label className={labelClass}>Sizes</label>
+              <div className="flex gap-2 flex-wrap">
+                {SIZES.map((size) => {
+                  const isSelected = selectedSizes.includes(size);
+                  return (
+                    <button
+                      key={size}
+                      type="button"
+                      onClick={() => toggleSize(size)}
+                      className={`px-3 py-1.5 rounded-md text-xs font-medium border transition-all cursor-pointer ${
+                        isSelected
+                          ? 'bg-blue-600 border-blue-500 text-white'
+                          : 'bg-[#11141a] border-[#2b3342] text-gray-300 hover:border-blue-500'
+                      }`}
+                    >
+                      {size}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Discount Codes */}
+            <div>
+              <label className={labelClass}>
+                Select Discount Codes (optional)
+              </label>
+              <select
+                value={discountCode}
+                onChange={(e) => setDiscountCode(e.target.value)}
+                className={selectClass}
+                disabled={isLoading}
+              >
+                <option value="" className="bg-[#11141a] text-gray-500">
+                  {isLoading ? 'Loading discount codes...' : 'Select discount code'}
+                </option>
+                {allDiscountCodes.map((code: DiscountCode) => (
+                  <option
+                    key={code.id}
+                    value={code.discountCode}
+                    className="bg-[#11141a]"
+                  >
+                    {code.public_name} ({code.discountCode} -{' '}
+                    {code.discountValue}
+                    {code.discountType?.toLowerCase() === 'percentage'
+                      ? '%'
+                      : '$'}
+                    )
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex gap-3 pt-4">
+              <button
+                type="button"
+                onClick={handleSaveDraft}
+                className="flex-1 py-3 bg-[#1a2235] hover:bg-[#1e2a42] border border-[#2b3a55] text-gray-200 font-medium text-sm rounded-lg transition-colors cursor-pointer"
+              >
+                Save Draft
+              </button>
+              <button
+                type="button"
+                onClick={handleCreate}
+                className="flex-1 py-3 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-medium text-sm rounded-lg transition-colors cursor-pointer shadow-lg"
+              >
+                Create
               </button>
             </div>
           </div>

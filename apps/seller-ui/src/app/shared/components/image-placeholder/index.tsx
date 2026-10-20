@@ -46,7 +46,7 @@ const ImagePlaceholder = ({
   return (
     <div
       className={`relative w-full ${
-        small ? 'h-[140px]' : 'aspect-[765/850] min-h-[420px]'
+        small ? 'h-[110px]' : 'aspect-[765/850] min-h-[280px]'
       } rounded-xl bg-[#12151c] border border-[#232936] flex flex-col justify-center items-center overflow-hidden transition-all duration-200 group hover:border-[#333c4d]`}
     >
       <input

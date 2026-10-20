@@ -13,6 +13,8 @@ import {
   Bell,
   Mail,
   Settings,
+  TicketPercent,
+  LogOut,
 } from 'lucide-react';
 import useSidebar from '@/app/hooks/useSidebar';
 import { useSeller } from '@/app/hooks/useSeller';
@@ -132,6 +134,20 @@ const SidebarBarWrapper = () => {
             href="/dashboard/settings"
             icon={<Settings className="w-[19px] h-[19px]" />}
             isActive={checkIsActive('/dashboard/settings')}
+          />
+        </SidebarMenu>
+        <SidebarMenu title="Extras">
+          <SidebarItem
+            title="Discount Codes"
+            href="/dashboard/discount-codes"
+            icon={<TicketPercent className="w-[19px] h-[19px]" />}
+            isActive={checkIsActive('/dashboard/discount-codes')}
+          />
+          <SidebarItem
+            title="Logout"
+            href="/dashboard/logout"
+            icon={<LogOut className="w-[19px] h-[19px]" />}
+            isActive={checkIsActive('/dashboard/logout')}
           />
         </SidebarMenu>
       </div>
