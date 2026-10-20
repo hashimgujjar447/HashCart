@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useState } from 'react';
+import React from 'react';
 import Image from 'next/image';
-import { Pencil, WandSparkles, X } from 'lucide-react';
+import { Loader2, Pencil, WandSparkles, X } from 'lucide-react';
 
 interface ImagePlaceholderProps {
   size: string;
@@ -11,7 +11,9 @@ interface ImagePlaceholderProps {
   onImageRemove: (index: number) => void;
   defaultImage?: string | null;
   index?: number | null;
-  setOpenImageModel: (open: boolean) => void;
+  setOpenImageModel?: (open: boolean) => void;
+  onEdit?: (index: number) => void;
+  isUploading?: boolean;
 }
 
 const ImagePlaceholder = ({
@@ -22,23 +24,29 @@ const ImagePlaceholder = ({
   defaultImage = null,
   index = 0,
   setOpenImageModel,
+  onEdit,
+  isUploading = false,
 }: ImagePlaceholderProps) => {
-  const [imagePreview, setImagePreview] = useState<string | null>(
-    defaultImage || null,
-  );
-
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event?.target?.files?.[0];
     if (file) {
-      setImagePreview(URL.createObjectURL(file));
       onImageChange(file, index ?? 0);
     }
+    event.target.value = '';
   };
 
   const handleRemove = (e: React.MouseEvent) => {
     e.stopPropagation();
-    setImagePreview(null);
     onImageRemove(index ?? 0);
+  };
+
+  const handleEdit = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (onEdit) {
+      onEdit(index ?? 0);
+    } else if (setOpenImageModel) {
+      setOpenImageModel(true);
+    }
   };
 
   const inputId = `image-upload-${index ?? 0}`;
@@ -55,33 +63,42 @@ const ImagePlaceholder = ({
         className="hidden"
         onChange={handleFileChange}
         id={inputId}
+        disabled={isUploading}
       />
 
-      {imagePreview ? (
+      {isUploading ? (
+        <div className="w-full h-full flex flex-col justify-center items-center gap-2 select-none">
+          <Loader2 className="w-6 h-6 text-blue-500 animate-spin" />
+          <span className="text-[11px] text-gray-400 font-medium">
+            Uploading...
+          </span>
+        </div>
+      ) : defaultImage ? (
         <>
           <Image
-            src={imagePreview}
+            src={defaultImage}
             alt="Product Preview"
             fill
+            unoptimized
             className="object-cover w-full h-full rounded-xl"
           />
 
-          <div className="absolute top-3 right-3 flex items-center gap-2 z-20">
+          <div className="absolute top-2.5 right-2.5 flex items-center gap-1.5 z-20">
             <button
               type="button"
-              onClick={() => setOpenImageModel(true)}
-              className="w-8 h-8 rounded-lg bg-blue-600/90 hover:bg-blue-600 text-white flex items-center justify-center shadow-lg transition-colors cursor-pointer"
-              title="AI enhance"
+              onClick={handleEdit}
+              className="w-7 h-7 rounded-lg bg-blue-600/90 hover:bg-blue-600 text-white flex items-center justify-center shadow-lg transition-colors cursor-pointer"
+              title="Enhance image"
             >
-              <WandSparkles className="w-4 h-4" />
+              <WandSparkles className="w-3.5 h-3.5" />
             </button>
             <button
               type="button"
               onClick={handleRemove}
-              className="w-8 h-8 rounded-lg bg-red-600/90 hover:bg-red-600 text-white flex items-center justify-center shadow-lg transition-colors cursor-pointer"
+              className="w-7 h-7 rounded-lg bg-red-600/90 hover:bg-red-600 text-white flex items-center justify-center shadow-lg transition-colors cursor-pointer"
               title="Remove image"
             >
-              <X className="w-4 h-4" />
+              <X className="w-3.5 h-3.5" />
             </button>
           </div>
         </>
@@ -90,8 +107,8 @@ const ImagePlaceholder = ({
           htmlFor={inputId}
           className="w-full h-full flex flex-col justify-center items-center cursor-pointer p-4 select-none"
         >
-          <div className="absolute top-3.5 right-3.5 w-9 h-9 rounded-lg bg-[#182844] border border-[#24395c] text-[#60a5fa] flex items-center justify-center shadow-sm group-hover:bg-[#1e345b] transition-colors">
-            <Pencil className="w-4 h-4" />
+          <div className="absolute top-3 right-3 w-8 h-8 rounded-lg bg-[#182844] border border-[#24395c] text-[#60a5fa] flex items-center justify-center shadow-sm group-hover:bg-[#1e345b] transition-colors">
+            <Pencil className="w-3.5 h-3.5" />
           </div>
 
           <span

@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { ChevronRight, Plus, PlusCircle, Trash2, X } from 'lucide-react';
 import ImagePlaceholder from '@/app/shared/components/image-placeholder';
+import EnhanceImageModal from '@/app/shared/components/enhance-image-modal';
 import Input from '@packages/components/input';
 import RichTextEditor from '@packages/rich-text-editor';
 import { useQuery } from '@tanstack/react-query';
@@ -50,6 +51,11 @@ const CreateProductPage = () => {
   const [stock, setStock] = useState('');
   const [selectedSizes, setSelectedSizes] = useState<string[]>([]);
   const [discountCode, setDiscountCode] = useState('');
+
+  const [openImageModel, setOpenImageModel] = useState(false);
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [uploadingIndex, setUploadingIndex] = useState<number | null>(null);
+  const [isUploadDone, setIsUploadDone] = useState(false);
 
   const [availableColors, setAvailableColors] = useState<string[]>([
     '#ffffff',
@@ -116,6 +122,8 @@ const CreateProductPage = () => {
     if (!file) return;
 
     try {
+      setUploadingIndex(index);
+      setIsUploadDone(false);
       const fileName = await convertFileToBase64(file);
       const response = await axiosInstance.post(
         '/product/upload-product-image',
@@ -123,18 +131,21 @@ const CreateProductPage = () => {
       );
       const updatedImages = [...images];
 
-      const uploadedImage = {
-        fileId: response.data?.fileId || '',
+      const uploadedImage: Uploaded = {
+        fileId: response.data?.fileId || response.data?.fileName || '',
         fileUrl: response.data?.file_url || '',
       };
 
-      updatedImages[index] = uploadedImage || null;
+      updatedImages[index] = uploadedImage;
       if (index === images.length - 1 && updatedImages.length < 8) {
         updatedImages.push(null);
       }
       setImages(updatedImages);
+      setIsUploadDone(true);
     } catch (error) {
       console.error('Error uploading image:', error);
+    } finally {
+      setUploadingIndex(null);
     }
   };
 
@@ -148,9 +159,8 @@ const CreateProductPage = () => {
         typeof imageToDelete === 'object' &&
         'fileId' in imageToDelete
       ) {
-        // delete our picture
         await axiosInstance.delete('/product/delete-product-image', {
-          data: { fileId: imageToDelete['fileId'] },
+          data: { fileId: imageToDelete.fileId },
         });
       }
 
@@ -297,27 +307,50 @@ const CreateProductPage = () => {
           {/* ── Column 1: Images ── */}
           <div className="w-full">
             <ImagePlaceholder
-              setOpenImageModel={() => {}}
               size="765 x 850"
               small={false}
               index={0}
+              defaultImage={images[0]?.fileUrl || null}
+              isUploading={uploadingIndex === 0}
               onImageChange={handleImageChange}
               onImageRemove={handleImageRemove}
+              onEdit={(idx) => {
+                setSelectedImage(images[idx]?.fileUrl || null);
+                setOpenImageModel(true);
+              }}
             />
             {images.length > 1 && (
               <div className="grid grid-cols-3 gap-2 mt-3">
-                {images.slice(1).map((_, index) => (
-                  <ImagePlaceholder
-                    key={index + 1}
-                    setOpenImageModel={() => {}}
-                    size="765 x 850"
-                    small={true}
-                    index={index + 1}
-                    onImageChange={handleImageChange}
-                    onImageRemove={handleImageRemove}
-                  />
-                ))}
+                {images.slice(1).map((img, index) => {
+                  const actualIndex = index + 1;
+                  return (
+                    <ImagePlaceholder
+                      key={actualIndex}
+                      size="765 x 850"
+                      small={true}
+                      index={actualIndex}
+                      defaultImage={img?.fileUrl || null}
+                      isUploading={uploadingIndex === actualIndex}
+                      onImageChange={handleImageChange}
+                      onImageRemove={handleImageRemove}
+                      onEdit={(idx) => {
+                        setSelectedImage(images[idx]?.fileUrl || null);
+                        setOpenImageModel(true);
+                      }}
+                    />
+                  );
+                })}
               </div>
+            )}
+            {uploadingIndex !== null && (
+              <p className="text-xs text-blue-400 mt-2 text-center">
+                Uploading image, please wait...
+              </p>
+            )}
+            {isUploadDone && uploadingIndex === null && (
+              <p className="text-xs text-emerald-400 mt-2 text-center">
+                Image uploaded successfully!
+              </p>
             )}
           </div>
 
@@ -759,6 +792,14 @@ const CreateProductPage = () => {
               </button>
             </div>
           </div>
+          <EnhanceImageModal
+            isOpen={openImageModel}
+            onClose={() => {
+              setOpenImageModel(false);
+              setSelectedImage(null);
+            }}
+            imageUrl={selectedImage}
+          />
         </div>
       </form>
     </div>
