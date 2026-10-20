@@ -25,10 +25,15 @@ interface DiscountCode {
 const selectClass =
   'w-full bg-[#11141a] border border-[#2b3342] text-gray-200 text-sm rounded-lg p-2.5 focus:border-blue-500 focus:outline-none cursor-pointer';
 
+interface Uploaded {
+  fileId: string;
+  fileUrl: string;
+}
+
 const labelClass = 'block mb-2 text-sm font-medium text-gray-200';
 
 const CreateProductPage = () => {
-  const [images, setImages] = useState<(File | null)[]>([null]);
+  const [images, setImages] = useState<(Uploaded | null)[]>([null]);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [detailedDescription, setDetailedDescription] = useState('');
@@ -94,20 +99,71 @@ const CreateProductPage = () => {
   const categories = data?.categories || [];
   const subCategories = data?.subCategories || {};
 
-  const handleImageChange = (file: File | null, index: number) => {
-    const updatedImages = [...images];
-    updatedImages[index] = file;
-    if (index === images.length - 1 && images.length < 8 && file) {
-      updatedImages.push(null);
-    }
-    setImages(updatedImages);
+  const convertFileToBase64 = (file: File) => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => {
+        resolve(reader.result);
+      };
+      reader.onerror = () => {
+        reject(new Error('Error reading file'));
+      };
+    });
   };
 
-  const handleImageRemove = (index: number) => {
-    const updatedImages = [...images];
-    updatedImages.splice(index, 1);
-    if (updatedImages.length === 0) updatedImages.push(null);
-    setImages(updatedImages);
+  const handleImageChange = async (file: File | null, index: number) => {
+    if (!file) return;
+
+    try {
+      const fileName = await convertFileToBase64(file);
+      const response = await axiosInstance.post(
+        '/product/upload-product-image',
+        { fileName },
+      );
+      const updatedImages = [...images];
+
+      const uploadedImage = {
+        fileId: response.data?.fileId || '',
+        fileUrl: response.data?.file_url || '',
+      };
+
+      updatedImages[index] = uploadedImage || null;
+      if (index === images.length - 1 && updatedImages.length < 8) {
+        updatedImages.push(null);
+      }
+      setImages(updatedImages);
+    } catch (error) {
+      console.error('Error uploading image:', error);
+    }
+  };
+
+  const handleImageRemove = async (index: number) => {
+    try {
+      const updatedImages = [...images];
+
+      const imageToDelete = updatedImages[index];
+      if (
+        imageToDelete &&
+        typeof imageToDelete === 'object' &&
+        'fileId' in imageToDelete
+      ) {
+        // delete our picture
+        await axiosInstance.delete('/product/delete-product-image', {
+          data: { fileId: imageToDelete['fileId'] },
+        });
+      }
+
+      updatedImages.splice(index, 1);
+
+      if (!updatedImages.includes(null) && updatedImages.length < 8) {
+        updatedImages.push(null);
+      }
+
+      setImages(updatedImages);
+    } catch (error) {
+      console.error('Error removing image:', error);
+    }
   };
 
   const toggleColor = (color: string) => {
@@ -664,7 +720,9 @@ const CreateProductPage = () => {
                 disabled={isLoading}
               >
                 <option value="" className="bg-[#11141a] text-gray-500">
-                  {isLoading ? 'Loading discount codes...' : 'Select discount code'}
+                  {isLoading
+                    ? 'Loading discount codes...'
+                    : 'Select discount code'}
                 </option>
                 {allDiscountCodes.map((code: DiscountCode) => (
                   <option

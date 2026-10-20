@@ -3,6 +3,7 @@ import { ValidationError } from '../../../../packages/error-handler';
 import prisma from '../../../../packages/libs/prisma';
 
 import { NextFunction, Request, Response } from 'express';
+import imageKit from '../../../../packages/libs/imageKit';
 
 export const getCategories = async (
   req: Request,
@@ -133,6 +134,53 @@ export const deleteDiscountCode = async (
     res.status(200).json({
       success: true,
       message: 'Discount code deleted successfully',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const uploadProductImage = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const { fileName } = req.body;
+
+    const response = await imageKit.upload({
+      file: fileName,
+      fileName: `Product-${Date.now()}.jpg`,
+      folder: '/products',
+    });
+
+    res.status(200).json({
+      success: true,
+      fileId: response.fileId,
+      file_url: response.url,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const deleteProductImage = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const { fileId } = req.body;
+    if (!fileId) {
+      return next(new ValidationError('File ID is required'));
+    }
+
+    const response = await imageKit.deleteFile(fileId);
+
+    res.status(200).json({
+      success: true,
+      message: 'Image deleted successfully',
+      response,
     });
   } catch (error) {
     next(error);

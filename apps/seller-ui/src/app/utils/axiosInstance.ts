@@ -44,7 +44,7 @@ axiosInstance.interceptors.response.use(
       error.config?.url,
     );
 
-    if ((status === 401 || status === 500) && !originalRequest._retry) {
+    if (status === 401 && !originalRequest._retry) {
       if (refreshing) {
         console.log(
           '[Axios] Refresh already in progress. Queuing request:',
