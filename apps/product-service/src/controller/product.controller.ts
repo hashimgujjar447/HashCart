@@ -186,3 +186,152 @@ export const deleteProductImage = async (
     next(error);
   }
 };
+
+export const createProduct = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const {
+      title,
+      description,
+      detailedDescription,
+      tags,
+      warranty,
+      slug,
+      brand,
+      cashOnDelivery = 'yes',
+      video_url,
+      videoUrl,
+      category,
+      colors = [],
+      sizes = [],
+      discountCodes,
+      discountCode,
+      stock,
+      sale_price,
+      salePrice,
+      regular_price,
+      regularPrice,
+      subCategory,
+      customProperties = {},
+      images = [],
+      specifications = [],
+      status = 'Active',
+    } = req.body;
+
+    const actualSalePrice = sale_price ?? salePrice;
+    const actualRegularPrice = regular_price ?? regularPrice;
+    const actualVideoUrl = video_url ?? videoUrl;
+    const actualDiscountCode = discountCodes ?? discountCode;
+
+    if (status !== 'Draft') {
+      if (
+        !title ||
+        !description ||
+        !detailedDescription ||
+        !tags ||
+        !warranty ||
+        !slug ||
+        !category ||
+        !subCategory ||
+        actualSalePrice === undefined ||
+        actualSalePrice === null ||
+        actualSalePrice === '' ||
+        stock === undefined ||
+        stock === null ||
+        stock === ''
+      ) {
+        return next(
+          new ValidationError('All required fields must be provided'),
+        );
+      }
+    } else {
+      if (!title || !slug) {
+        return next(
+          new ValidationError('Title and slug are required to save draft'),
+        );
+      }
+    }
+
+    const isSlugExist = await prisma.products.findUnique({
+      where: { slug },
+    });
+
+    if (isSlugExist) {
+      return next(
+        new ValidationError(
+          'Product slug already exists. Please choose another slug!',
+        ),
+      );
+    }
+
+    const parsedSalePrice = actualSalePrice ? parseFloat(actualSalePrice) : 0;
+    const parsedRegularPrice = actualRegularPrice
+      ? parseFloat(actualRegularPrice)
+      : null;
+    const parsedStock = stock ? parseInt(stock, 10) : 0;
+
+    const formattedDiscountCodes = Array.isArray(actualDiscountCode)
+      ? (actualDiscountCode as string[])
+      : actualDiscountCode
+        ? [actualDiscountCode as string]
+        : [];
+
+    const productImages = Array.isArray(images)
+      ? images
+          .filter((img: any) => img && (img.fileUrl || img.url))
+          .map((img: any) => ({
+            file_id: img.fileId || img.file_id || '',
+            url: img.fileUrl || img.url || '',
+          }))
+      : [];
+
+    const product = await prisma.products.create({
+      data: {
+        title,
+        description: description || '',
+        detailedDescription: detailedDescription || '',
+        tags: tags || '',
+        warranty: warranty || '',
+        slug,
+        brand: brand || null,
+        cashOnDelivery: cashOnDelivery || 'yes',
+        video_url: actualVideoUrl || null,
+        category: category || '',
+        subCategory: subCategory || '',
+        colors: Array.isArray(colors) ? (colors as string[]) : [],
+        sizes: Array.isArray(sizes) ? (sizes as string[]) : [],
+        discountCodes: formattedDiscountCodes,
+        stock: parsedStock,
+        sale_price: parsedSalePrice,
+        regular_price: parsedRegularPrice,
+        customProperties: customProperties as any,
+        images: {
+          create: productImages,
+        },
+        specifications: Array.isArray(specifications)
+          ? (specifications as any)
+          : [],
+        sellerId: req.seller?.id || '',
+        shopId: req.seller?.shop?.id || null,
+        status: status === 'Draft' ? 'Draft' : 'Active',
+      },
+      include: {
+        images: true,
+      },
+    });
+
+    return res.status(201).json({
+      success: true,
+      message:
+        status === 'Draft'
+          ? 'Product draft saved successfully'
+          : 'Product created successfully',
+      product,
+    });
+  } catch (error) {
+    next(error);
+  }
+};

@@ -20,9 +20,11 @@ model images {
   url     String
   shopId  String? @unique @db.ObjectId
 
-  userId String? @unique @db.ObjectId
-  users  users?  @relation(fields: [userId], references: [id])
-  shops  shops?  @relation(fields: [shopId], references: [id])
+  userId    String?   @unique @db.ObjectId
+  users     users?    @relation(fields: [userId], references: [id])
+  shops     shops?    @relation(fields: [shopId], references: [id])
+  productId String?   @db.ObjectId
+  products  products? @relation(fields: [productId], references: [id])
 }
 
 model users {
@@ -64,6 +66,7 @@ model shops {
   reviews       shopReviews[]
   sellerId      String        @unique @db.ObjectId
   sellers       sellers       @relation(fields: [sellerId], references: [id])
+  products      products[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -99,4 +102,46 @@ model discount_codes{
   sellerId String @db.ObjectId
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+enum productStatus {
+  Active
+  Pending
+  Draft
+  OutOfStock
+  Discontinued
+}
+
+model products {
+  id                  String   @id @default(auto()) @map("_id") @db.ObjectId
+  title               String
+  description         String
+  detailedDescription String
+  tags                String
+  warranty            String
+  slug                String   @unique
+  brand               String?
+  cashOnDelivery      String   @default("yes")
+  category            String
+  subCategory         String
+  video_url           String?
+  regular_price       Float?
+  sale_price          Float
+  stock               Int
+  sizes               String[]
+  discountCodes       String[] @db.ObjectId
+  colors              String[]
+  specifications      Json?
+  customProperties    Json?
+  images              images[]
+  sellerId            String   @db.ObjectId
+  shopId              String?  @db.ObjectId
+  status              productStatus @default(Active)
+  ratings            Float    @default(5)
+  starting_date       DateTime?
+  ending_date         DateTime?
+  isDeleted           Boolean  @default(false)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  shop                shops?   @relation(fields: [shopId], references: [id])
 }

@@ -2,7 +2,8 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
-import { ChevronRight, Plus, PlusCircle, Trash2, X } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { ChevronRight, Loader2, Plus, PlusCircle, Trash2, X } from 'lucide-react';
 import ImagePlaceholder from '@/app/shared/components/image-placeholder';
 import EnhanceImageModal from '@/app/shared/components/enhance-image-modal';
 import Input from '@packages/components/input';
@@ -34,7 +35,11 @@ interface Uploaded {
 const labelClass = 'block mb-2 text-sm font-medium text-gray-200';
 
 const CreateProductPage = () => {
+  const router = useRouter();
   const [images, setImages] = useState<(Uploaded | null)[]>([null]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [formError, setFormError] = useState('');
+  const [formSuccess, setFormSuccess] = useState('');
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [detailedDescription, setDetailedDescription] = useState('');
@@ -54,6 +59,9 @@ const CreateProductPage = () => {
 
   const [openImageModel, setOpenImageModel] = useState(false);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [selectedImageIndex, setSelectedImageIndex] = useState<number | null>(
+    null,
+  );
   const [uploadingIndex, setUploadingIndex] = useState<number | null>(null);
   const [isUploadDone, setIsUploadDone] = useState(false);
 
@@ -176,6 +184,20 @@ const CreateProductPage = () => {
     }
   };
 
+  const handleApplyEnhancement = (newUrl: string) => {
+    if (selectedImageIndex !== null && images[selectedImageIndex]) {
+      const updated = [...images];
+      updated[selectedImageIndex] = {
+        ...updated[selectedImageIndex]!,
+        fileUrl: newUrl,
+      };
+      setImages(updated);
+    }
+    setOpenImageModel(false);
+    setSelectedImage(null);
+    setSelectedImageIndex(null);
+  };
+
   const toggleColor = (color: string) => {
     setSelectedColors((prev) =>
       prev.includes(color) ? prev.filter((c) => c !== color) : [...prev, color],
@@ -254,7 +276,7 @@ const CreateProductPage = () => {
     setCustomProperties(updated);
   };
 
-  const buildPayload = () => ({
+  const buildPayload = (status: 'Active' | 'Draft' = 'Active') => ({
     title,
     description,
     detailedDescription,
@@ -275,16 +297,74 @@ const CreateProductPage = () => {
     specifications: specifications.filter((s) => s.name || s.value),
     customProperties,
     images: images.filter((img) => img !== null),
+    status,
   });
 
-  const handleSaveDraft = (e: React.FormEvent) => {
+  const handleSaveDraft = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('Save Draft:', buildPayload());
+    setFormError('');
+    setFormSuccess('');
+
+    if (!title.trim() || !slug.trim()) {
+      setFormError('Title and slug are required to save draft');
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+      await axiosInstance.post(
+        '/product/create-product',
+        buildPayload('Draft'),
+      );
+      setFormSuccess('Draft saved successfully!');
+    } catch (err: any) {
+      setFormError(
+        err?.response?.data?.message || 'Failed to save draft. Please try again.',
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
-  const handleCreate = (e: React.FormEvent) => {
+  const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('Create Product:', buildPayload());
+    setFormError('');
+    setFormSuccess('');
+
+    if (
+      !title.trim() ||
+      !description.trim() ||
+      !detailedDescription.trim() ||
+      !tags.trim() ||
+      !warranty.trim() ||
+      !slug.trim() ||
+      !category ||
+      !subCategory ||
+      salePrice === '' ||
+      stock === ''
+    ) {
+      setFormError('Please fill in all required fields marked with *');
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+      await axiosInstance.post(
+        '/product/create-product',
+        buildPayload('Active'),
+      );
+      setFormSuccess('Product created successfully!');
+      setTimeout(() => {
+        router.push('/dashboard');
+      }, 1200);
+    } catch (err: any) {
+      setFormError(
+        err?.response?.data?.message ||
+          'Failed to create product. Please try again.',
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -303,6 +383,16 @@ const CreateProductPage = () => {
       </div>
 
       <form className="w-full pb-16">
+        {formError && (
+          <div className="mb-6 p-4 rounded-xl bg-red-950/60 border border-red-500/30 text-red-300 text-sm">
+            {formError}
+          </div>
+        )}
+        {formSuccess && (
+          <div className="mb-6 p-4 rounded-xl bg-emerald-950/60 border border-emerald-500/30 text-emerald-300 text-sm">
+            {formSuccess}
+          </div>
+        )}
         <div className="grid grid-cols-1 lg:grid-cols-[260px_1fr_1fr] gap-6 w-full items-start">
           {/* ── Column 1: Images ── */}
           <div className="w-full">
@@ -316,6 +406,7 @@ const CreateProductPage = () => {
               onImageRemove={handleImageRemove}
               onEdit={(idx) => {
                 setSelectedImage(images[idx]?.fileUrl || null);
+                setSelectedImageIndex(idx);
                 setOpenImageModel(true);
               }}
             />
@@ -335,6 +426,7 @@ const CreateProductPage = () => {
                       onImageRemove={handleImageRemove}
                       onEdit={(idx) => {
                         setSelectedImage(images[idx]?.fileUrl || null);
+                        setSelectedImageIndex(idx);
                         setOpenImageModel(true);
                       }}
                     />
@@ -779,16 +871,22 @@ const CreateProductPage = () => {
               <button
                 type="button"
                 onClick={handleSaveDraft}
-                className="flex-1 py-3 bg-[#1a2235] hover:bg-[#1e2a42] border border-[#2b3a55] text-gray-200 font-medium text-sm rounded-lg transition-colors cursor-pointer"
+                disabled={isSubmitting}
+                className="flex-1 py-3 bg-[#1a2235] hover:bg-[#1e2a42] disabled:opacity-50 border border-[#2b3a55] text-gray-200 font-medium text-sm rounded-lg transition-colors cursor-pointer"
               >
                 Save Draft
               </button>
               <button
                 type="button"
                 onClick={handleCreate}
-                className="flex-1 py-3 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-medium text-sm rounded-lg transition-colors cursor-pointer shadow-lg"
+                disabled={isSubmitting}
+                className="flex-1 py-3 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 disabled:opacity-50 text-white font-medium text-sm rounded-lg transition-colors cursor-pointer shadow-lg flex items-center justify-center gap-2"
               >
-                Create
+                {isSubmitting ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <span>Create</span>
+                )}
               </button>
             </div>
           </div>
@@ -797,8 +895,11 @@ const CreateProductPage = () => {
             onClose={() => {
               setOpenImageModel(false);
               setSelectedImage(null);
+              setSelectedImageIndex(null);
             }}
             imageUrl={selectedImage}
+            onApply={handleApplyEnhancement}
+            setSelectedImage={setSelectedImage}
           />
         </div>
       </form>
