@@ -117,7 +117,7 @@ model products {
   title               String
   description         String
   detailedDescription String
-  tags                String
+  tags                String[]
   warranty            String
   slug                String   @unique
   brand               String?

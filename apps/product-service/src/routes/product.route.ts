@@ -7,6 +7,11 @@ import {
   getCategories,
   getDiscountCodes,
   uploadProductImage,
+  getProducts,
+  deleteProductById,
+  restoreProduct,
+  getProductById,
+  editProduct,
 } from '../controller/product.controller';
 import { isAuthenticated } from '../../../../packages/middleware/isAuthenticated.middleware';
 import { isSeller } from '../../../../packages/middleware/authorizeRoles';
@@ -48,11 +53,22 @@ router.delete(
   deleteProductImage,
 );
 
-router.post(
-  '/create-product',
+router.post('/create-product', isAuthenticated, isSeller, createProduct);
+
+router.get('/get-products', isAuthenticated, isSeller, getProducts);
+router.get('/get-product/:id', getProductById);
+router.put('/edit-product/:id', isAuthenticated, isSeller, editProduct);
+router.put('/update-product/:id', isAuthenticated, isSeller, editProduct);
+
+router.delete(
+  '/delete-product/:id',
   isAuthenticated,
   isSeller,
-  createProduct,
+  deleteProductById,
 );
+
+router.put('/restore-product/:id', isAuthenticated, isSeller, restoreProduct);
+
+router.post('/restore-product/:id', isAuthenticated, isSeller, restoreProduct);
 
 export default router;

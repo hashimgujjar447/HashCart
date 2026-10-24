@@ -7,7 +7,6 @@ import rateLimit from 'express-rate-limit';
 import { errorMiddleware } from '../../../packages/error-handler/error-middleware';
 import cookieParser from 'cookie-parser';
 import { connectRedis } from '../../../packages/redis/redis';
-import { initializeSiteConfig } from './lib/initializeSiteConfig';
 
 const app = express();
 
@@ -62,12 +61,6 @@ const startServer = async () => {
 
     const server = app.listen(port, () => {
       console.log(`Listening at http://localhost:${port}/api`);
-      try {
-        initializeSiteConfig();
-        console.log('Site config initialized successfully');
-      } catch (error) {
-        console.error('Failed to initialize site config:', error);
-      }
     });
 
     server.on('error', console.error);

@@ -1,9 +1,16 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { ChevronRight, Loader2, Plus, PlusCircle, Trash2, X } from 'lucide-react';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
+import {
+  ChevronRight,
+  Loader2,
+  Plus,
+  PlusCircle,
+  Trash2,
+  X,
+} from 'lucide-react';
 import ImagePlaceholder from '@/app/shared/components/image-placeholder';
 import EnhanceImageModal from '@/app/shared/components/enhance-image-modal';
 import Input from '@packages/components/input';
@@ -35,9 +42,16 @@ interface Uploaded {
 const labelClass = 'block mb-2 text-sm font-medium text-gray-200';
 
 const CreateProductPage = () => {
+  const params = useSearchParams();
+  const routeParams = useParams();
+  const editId =
+    params.get('edit') || params.get('id') || (routeParams?.id as string);
+  const isEditMode = Boolean(editId);
+
   const router = useRouter();
   const [images, setImages] = useState<(Uploaded | null)[]>([null]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLoadingProduct, setIsLoadingProduct] = useState(false);
   const [formError, setFormError] = useState('');
   const [formSuccess, setFormSuccess] = useState('');
   const [title, setTitle] = useState('');
@@ -56,6 +70,7 @@ const CreateProductPage = () => {
   const [stock, setStock] = useState('');
   const [selectedSizes, setSelectedSizes] = useState<string[]>([]);
   const [discountCode, setDiscountCode] = useState('');
+  const [productStatus, setProductStatus] = useState<'Active' | 'Draft'>('Active');
 
   const [openImageModel, setOpenImageModel] = useState(false);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
@@ -280,7 +295,14 @@ const CreateProductPage = () => {
     title,
     description,
     detailedDescription,
-    tags,
+    tags: Array.isArray(tags)
+      ? tags
+      : typeof tags === 'string'
+        ? tags
+            .split(',')
+            .map((tag) => tag.trim())
+            .filter((tag) => tag !== '')
+        : [],
     warranty,
     slug,
     brand,
@@ -312,14 +334,23 @@ const CreateProductPage = () => {
 
     try {
       setIsSubmitting(true);
-      await axiosInstance.post(
-        '/product/create-product',
-        buildPayload('Draft'),
-      );
-      setFormSuccess('Draft saved successfully!');
+      if (isEditMode && editId) {
+        await axiosInstance.put(
+          `/product/edit-product/${editId}`,
+          buildPayload('Draft'),
+        );
+        setFormSuccess('Draft updated successfully!');
+      } else {
+        await axiosInstance.post(
+          '/product/create-product',
+          buildPayload('Draft'),
+        );
+        setFormSuccess('Draft saved successfully!');
+      }
     } catch (err: any) {
       setFormError(
-        err?.response?.data?.message || 'Failed to save draft. Please try again.',
+        err?.response?.data?.message ||
+          'Failed to save draft. Please try again.',
       );
     } finally {
       setIsSubmitting(false);
@@ -349,40 +380,155 @@ const CreateProductPage = () => {
 
     try {
       setIsSubmitting(true);
-      await axiosInstance.post(
-        '/product/create-product',
-        buildPayload('Active'),
-      );
-      setFormSuccess('Product created successfully!');
+      if (isEditMode && editId) {
+        await axiosInstance.put(
+          `/product/edit-product/${editId}`,
+          buildPayload('Active'),
+        );
+        setFormSuccess('Product updated successfully!');
+      } else {
+        await axiosInstance.post(
+          '/product/create-product',
+          buildPayload('Active'),
+        );
+        setFormSuccess('Product created successfully!');
+      }
       setTimeout(() => {
-        router.push('/dashboard');
+        router.push('/dashboard/products');
       }, 1200);
     } catch (err: any) {
       setFormError(
         err?.response?.data?.message ||
-          'Failed to create product. Please try again.',
+          `Failed to ${isEditMode ? 'update' : 'create'} product. Please try again.`,
       );
     } finally {
       setIsSubmitting(false);
     }
   };
 
+  useEffect(() => {
+    if (editId) {
+      const fetchProductDetails = async () => {
+        try {
+          setIsLoadingProduct(true);
+          const response = await axiosInstance.get(
+            `/product/get-product/${editId}`,
+          );
+
+          const product = response.data?.product;
+          if (!product) return;
+
+          setTitle(product.title || '');
+          setProductStatus(product.status === 'Draft' ? 'Draft' : 'Active');
+          setDescription(product.description || '');
+          setDetailedDescription(product.detailedDescription || '');
+          setTags(
+            Array.isArray(product.tags)
+              ? product.tags.join(', ')
+              : product.tags || '',
+          );
+          setWarranty(product.warranty || '');
+          setSlug(product.slug || '');
+          setBrand(product.brand || '');
+          setCashOnDelivery(product.cashOnDelivery || 'yes');
+          setCategory(product.category || '');
+          setSubCategory(product.subCategory || '');
+          setVideoUrl(product.video_url || '');
+          setRegularPrice(
+            product.regular_price !== null && product.regular_price !== undefined
+              ? String(product.regular_price)
+              : '',
+          );
+          setSalePrice(
+            product.sale_price !== null && product.sale_price !== undefined
+              ? String(product.sale_price)
+              : '',
+          );
+          setStock(
+            product.stock !== null && product.stock !== undefined
+              ? String(product.stock)
+              : '',
+          );
+          setSelectedSizes(Array.isArray(product.sizes) ? product.sizes : []);
+          setSelectedColors(Array.isArray(product.colors) ? product.colors : []);
+          if (Array.isArray(product.colors) && product.colors.length > 0) {
+            setAvailableColors((prev) =>
+              Array.from(new Set([...prev, ...product.colors])),
+            );
+          }
+          setDiscountCode(
+            Array.isArray(product.discountCodes) && product.discountCodes.length > 0
+              ? product.discountCodes[0]
+              : product.discountCode || '',
+          );
+          setSpecifications(
+            Array.isArray(product.specifications) && product.specifications.length > 0
+              ? product.specifications
+              : [{ name: '', value: '' }],
+          );
+          setCustomProperties(
+            Array.isArray(product.customProperties)
+              ? product.customProperties
+              : [],
+          );
+
+          const mappedImages: (Uploaded | null)[] = (product.images || []).map(
+            (img: any) => ({
+              fileId: img?.file_id || img?.fileId || '',
+              fileUrl: img?.url || img?.fileUrl || '',
+            }),
+          );
+          if (mappedImages.length < 8) {
+            mappedImages.push(null);
+          }
+          setImages(mappedImages.length > 0 ? mappedImages : [null]);
+        } catch (err: any) {
+          setFormError(
+            err?.response?.data?.message || 'Failed to load product details',
+          );
+        } finally {
+          setIsLoadingProduct(false);
+        }
+      };
+
+      fetchProductDetails();
+    }
+  }, [editId]);
+
+  useEffect(() => {
+    console.log(images);
+  }, [images]);
   return (
     <div className="w-full max-w-[1600px] mx-auto py-2 text-white font-poppins">
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-white tracking-tight mb-1">
-          Create Product
+          {isEditMode ? 'Edit Product' : 'Create Product'}
         </h1>
         <div className="flex items-center text-xs text-gray-400 gap-1.5">
           <Link href="/dashboard" className="text-[#80deea] hover:underline">
             Dashboard
           </Link>
           <ChevronRight className="w-3.5 h-3.5 text-gray-500" />
-          <span className="text-gray-300">Create Product</span>
+          <Link
+            href="/dashboard/products"
+            className="text-gray-400 hover:text-white"
+          >
+            Products
+          </Link>
+          <ChevronRight className="w-3.5 h-3.5 text-gray-500" />
+          <span className="text-gray-300">
+            {isEditMode ? 'Edit Product' : 'Create Product'}
+          </span>
         </div>
       </div>
 
       <form className="w-full pb-16">
+        {isLoadingProduct && (
+          <div className="mb-6 p-4 rounded-xl bg-blue-950/40 border border-blue-500/30 text-blue-300 text-sm flex items-center gap-3">
+            <Loader2 className="w-4 h-4 animate-spin text-blue-400" />
+            <span>Loading product details...</span>
+          </div>
+        )}
         {formError && (
           <div className="mb-6 p-4 rounded-xl bg-red-950/60 border border-red-500/30 text-red-300 text-sm">
             {formError}
@@ -868,26 +1014,84 @@ const CreateProductPage = () => {
 
             {/* Action Buttons */}
             <div className="flex gap-3 pt-4">
-              <button
-                type="button"
-                onClick={handleSaveDraft}
-                disabled={isSubmitting}
-                className="flex-1 py-3 bg-[#1a2235] hover:bg-[#1e2a42] disabled:opacity-50 border border-[#2b3a55] text-gray-200 font-medium text-sm rounded-lg transition-colors cursor-pointer"
-              >
-                Save Draft
-              </button>
-              <button
-                type="button"
-                onClick={handleCreate}
-                disabled={isSubmitting}
-                className="flex-1 py-3 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 disabled:opacity-50 text-white font-medium text-sm rounded-lg transition-colors cursor-pointer shadow-lg flex items-center justify-center gap-2"
-              >
-                {isSubmitting ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
+              {isEditMode ? (
+                productStatus === 'Draft' ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={handleSaveDraft}
+                      disabled={isSubmitting || isLoadingProduct}
+                      className="flex-1 py-3 bg-[#1a2235] hover:bg-[#1e2a42] disabled:opacity-50 border border-[#2b3a55] text-gray-200 font-medium text-sm rounded-lg transition-colors cursor-pointer flex items-center justify-center gap-2"
+                    >
+                      {isSubmitting ? (
+                        <div className="flex items-center gap-2">
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          <span>Updating Draft...</span>
+                        </div>
+                      ) : (
+                        <span>Update Draft</span>
+                      )}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleCreate}
+                      disabled={isSubmitting || isLoadingProduct}
+                      className="flex-1 py-3 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 disabled:opacity-50 text-white font-medium text-sm rounded-lg transition-colors cursor-pointer shadow-lg flex items-center justify-center gap-2"
+                    >
+                      {isSubmitting ? (
+                        <div className="flex items-center gap-2">
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          <span>Publishing...</span>
+                        </div>
+                      ) : (
+                        <span>Publish Product</span>
+                      )}
+                    </button>
+                  </>
                 ) : (
-                  <span>Create</span>
-                )}
-              </button>
+                  <button
+                    type="button"
+                    onClick={handleCreate}
+                    disabled={isSubmitting || isLoadingProduct}
+                    className="w-full py-3 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 disabled:opacity-50 text-white font-medium text-sm rounded-lg transition-colors cursor-pointer shadow-lg flex items-center justify-center gap-2"
+                  >
+                    {isSubmitting ? (
+                      <div className="flex items-center gap-2">
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <span>Updating Product...</span>
+                      </div>
+                    ) : (
+                      <span>Update Product</span>
+                    )}
+                  </button>
+                )
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    onClick={handleSaveDraft}
+                    disabled={isSubmitting || isLoadingProduct}
+                    className="flex-1 py-3 bg-[#1a2235] hover:bg-[#1e2a42] disabled:opacity-50 border border-[#2b3a55] text-gray-200 font-medium text-sm rounded-lg transition-colors cursor-pointer"
+                  >
+                    Save Draft
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleCreate}
+                    disabled={isSubmitting || isLoadingProduct}
+                    className="flex-1 py-3 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 disabled:opacity-50 text-white font-medium text-sm rounded-lg transition-colors cursor-pointer shadow-lg flex items-center justify-center gap-2"
+                  >
+                    {isSubmitting ? (
+                      <div className="flex items-center gap-2">
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <span>Creating...</span>
+                      </div>
+                    ) : (
+                      <span>Create</span>
+                    )}
+                  </button>
+                </>
+              )}
             </div>
           </div>
           <EnhanceImageModal
