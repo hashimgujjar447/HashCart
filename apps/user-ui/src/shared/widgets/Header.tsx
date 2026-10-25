@@ -3,9 +3,11 @@ import Link from 'next/link';
 import React from 'react';
 import HeaderBottom from './header/header-bottom';
 import { useUser } from '@/hooks/useUser';
+import { useStore } from '@/store';
 
 const Header = () => {
   const { user, isLoading } = useUser();
+  const { cart, wishList } = useStore();
   return (
     <header className="w-full bg-white border-b border-gray-100 shadow-xs  z-50">
       <div className="w-[88%] max-w-7xl mx-auto py-3.5 flex items-center justify-between gap-6">
@@ -67,9 +69,11 @@ const Header = () => {
                 d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
               />
             </svg>
+            <span className="absolute 1 top-1 right-1 bg-red-500 text-white text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center">
+              {wishList.length}
+            </span>
           </Link>
 
-          {/* Cart */}
           <Link
             href="/cart"
             className="p-2 text-gray-600 hover:text-blue-600 hover:bg-gray-50 rounded-full transition-colors relative"
@@ -89,7 +93,7 @@ const Header = () => {
               />
             </svg>
             <span className="absolute 1 top-1 right-1 bg-blue-600 text-white text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center">
-              0
+              {cart.length}
             </span>
           </Link>
 

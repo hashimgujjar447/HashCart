@@ -2,6 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import { navItems } from '@/config/constants';
 import Link from 'next/link';
+import { useStore } from '@/store';
 
 type props = {
   user: any;
@@ -10,7 +11,7 @@ type props = {
 
 const HeaderBottom = ({ user, isLoading }: props) => {
   const [isSticky, setIsSticky] = useState(false);
-  console.log(user);
+  const { cart, wishList } = useStore();
 
   useEffect(() => {
     const handleScroll = () => {
@@ -126,7 +127,7 @@ const HeaderBottom = ({ user, isLoading }: props) => {
                 />
               </svg>
               <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center">
-                0
+                {wishList.length}
               </span>
             </Link>
 
@@ -147,8 +148,8 @@ const HeaderBottom = ({ user, isLoading }: props) => {
                   d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"
                 />
               </svg>
-              <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center">
-                0
+              <span className="absolute -top-1 -right-1 bg-blue-600 text-white text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center">
+                {cart.length}
               </span>
             </Link>
           </div>

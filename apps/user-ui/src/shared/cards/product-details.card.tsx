@@ -9,6 +9,10 @@ import {
   ShoppingBag,
   Heart,
 } from 'lucide-react';
+import { useStore } from '@/store';
+import { useUser } from '@/hooks/useUser';
+import { useLocationTracking } from '@/hooks/useLocation';
+import { useDevice } from '@/hooks/useDevice';
 
 interface ProductDetailsCardProps {
   data: any;
@@ -21,10 +25,16 @@ const ProductDetailsCard: React.FC<ProductDetailsCardProps> = ({
 }) => {
   const [selectedImage, setSelectedImage] = useState<number>(0);
   const [quantity, setQuantity] = useState<number>(1);
-  const [isWishlist, setIsWishlist] = useState<boolean>(false);
   const [selectedSize, setSelectedSize] = useState<string>(
     data?.sizes && data.sizes.length > 0 ? data.sizes[0] : '',
   );
+
+  const { user } = useUser();
+  const location = useLocationTracking();
+  const deviceInfo = useDevice();
+
+  const { wishlist, addToCart, addToWishlist, removeFromWishlist } = useStore();
+  const isWishlist = wishlist?.some((item) => item.id === data?.id);
 
   const images =
     data?.images && data.images.length > 0
@@ -38,6 +48,44 @@ const ProductDetailsCard: React.FC<ProductDetailsCardProps> = ({
     data?.shop?.avatar?.url ||
     data?.shop?.avatar ||
     'https://api.dicebear.com/7.x/bottts/svg?seed=shop';
+
+  const handleWishlist = () => {
+    if (isWishlist) {
+      removeFromWishlist(data?.id, user, location, deviceInfo);
+    } else if (data) {
+      addToWishlist(
+        {
+          id: data.id,
+          title: data.title,
+          price: data.sale_price,
+          image: activeImageUrl,
+          shopId: data.shopId || data.shop?.id || '',
+        },
+        user,
+        location,
+        deviceInfo,
+      );
+    }
+  };
+
+  const handleAddToCart = () => {
+    if (data) {
+      addToCart(
+        {
+          id: data.id,
+          title: data.title,
+          price: data.sale_price,
+          image: activeImageUrl,
+          quantity,
+          shopId: data.shopId || data.shop?.id || '',
+        },
+        user,
+        location,
+        deviceInfo,
+      );
+      setOpen(false);
+    }
+  };
 
   return (
     <div
@@ -202,6 +250,7 @@ const ProductDetailsCard: React.FC<ProductDetailsCardProps> = ({
 
                 <button
                   type="button"
+                  onClick={handleAddToCart}
                   className="bg-[#e74c3c] hover:bg-[#c0392b] text-white p-2.5 rounded-lg flex items-center justify-center transition-colors cursor-pointer shadow-sm"
                   title="Add to Cart"
                 >
@@ -210,7 +259,7 @@ const ProductDetailsCard: React.FC<ProductDetailsCardProps> = ({
 
                 <button
                   type="button"
-                  onClick={() => setIsWishlist(!isWishlist)}
+                  onClick={handleWishlist}
                   className="cursor-pointer hover:scale-110 transition-transform p-1"
                   title="Wishlist"
                 >
