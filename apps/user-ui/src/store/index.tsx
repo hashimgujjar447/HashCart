@@ -1,3 +1,4 @@
+import { sendKafkaEvent } from '@/actions/track-user';
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
@@ -86,6 +87,16 @@ export const useStore = create<Store>()(
             wishList: updated,
           });
         }
+
+        sendKafkaEvent({
+          userId: user?.id,
+          productId: product.id,
+          shopId: product.shopId,
+          action: 'add_to_wishList',
+          device: typeof deviceInfo === 'string' ? deviceInfo : deviceInfo?.device || '',
+          country: location?.country || '',
+          city: location?.city || '',
+        });
       };
 
       const removeFromWishlist = (
@@ -94,10 +105,83 @@ export const useStore = create<Store>()(
         location?: any,
         deviceInfo?: any,
       ) => {
+        const itemToRemove = get().wishlist.find((item) => item.id === id);
         const updated = get().wishlist.filter((item) => item.id !== id);
         set({
           wishlist: updated,
           wishList: updated,
+        });
+
+        sendKafkaEvent({
+          userId: user?.id,
+          productId: id,
+          shopId: itemToRemove?.shopId || '',
+          action: 'remove_from_wishList',
+          device: typeof deviceInfo === 'string' ? deviceInfo : deviceInfo?.device || '',
+          country: location?.country || '',
+          city: location?.city || '',
+        });
+      };
+
+      const addToCart = (
+        product: Product,
+        user?: any,
+        location?: any,
+        deviceInfo?: any,
+      ) => {
+        const existingProduct = get().cart.find(
+          (item) => item.id === product.id,
+        );
+        if (existingProduct) {
+          set({
+            cart: get().cart.map((item) =>
+              item.id === product.id
+                ? {
+                    ...item,
+                    quantity: (item.quantity || 1) + (product.quantity || 1),
+                  }
+                : item,
+            ),
+          });
+        } else {
+          set({
+            cart: [
+              ...get().cart,
+              { ...product, quantity: product.quantity || 1 },
+            ],
+          });
+        }
+
+        sendKafkaEvent({
+          userId: user?.id,
+          productId: product.id,
+          shopId: product.shopId,
+          action: 'add_to_cart',
+          device: typeof deviceInfo === 'string' ? deviceInfo : deviceInfo?.device || '',
+          country: location?.country || '',
+          city: location?.city || '',
+        });
+      };
+
+      const removeFromCart = (
+        id: string,
+        user?: any,
+        location?: any,
+        deviceInfo?: any,
+      ) => {
+        const itemToRemove = get().cart.find((item) => item.id === id);
+        set({
+          cart: get().cart.filter((item) => item.id !== id),
+        });
+
+        sendKafkaEvent({
+          userId: user?.id,
+          productId: id,
+          shopId: itemToRemove?.shopId || '',
+          action: 'remove_from_cart',
+          device: typeof deviceInfo === 'string' ? deviceInfo : deviceInfo?.device || '',
+          country: location?.country || '',
+          city: location?.city || '',
         });
       };
 
@@ -154,27 +238,8 @@ export const useStore = create<Store>()(
         cart: [],
         wishlist: [],
         wishList: [],
-        addToCart: (product, user, location, deviceInfo) => {
-          const existingProduct = get().cart.find((item) => item.id === product.id);
-          if (existingProduct) {
-            set({
-              cart: get().cart.map((item) =>
-                item.id === product.id
-                  ? { ...item, quantity: (item.quantity || 1) + (product.quantity || 1) }
-                  : item,
-              ),
-            });
-          } else {
-            set({
-              cart: [...get().cart, { ...product, quantity: product.quantity || 1 }],
-            });
-          }
-        },
-        removeFromCart: (id, user, location, deviceInfo) => {
-          set({
-            cart: get().cart.filter((item) => item.id !== id),
-          });
-        },
+        addToCart,
+        removeFromCart,
         addToWishlist,
         addToWishList: addToWishlist,
         removeFromWishlist,

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   X,
   Star,
@@ -13,6 +13,7 @@ import { useStore } from '@/store';
 import { useUser } from '@/hooks/useUser';
 import { useLocationTracking } from '@/hooks/useLocation';
 import { useDevice } from '@/hooks/useDevice';
+import { sendKafkaEvent } from '@/actions/track-user';
 
 interface ProductDetailsCardProps {
   data: any;
@@ -35,6 +36,20 @@ const ProductDetailsCard: React.FC<ProductDetailsCardProps> = ({
 
   const { wishlist, addToCart, addToWishlist, removeFromWishlist } = useStore();
   const isWishlist = wishlist?.some((item) => item.id === data?.id);
+
+  useEffect(() => {
+    if (data?.id) {
+      sendKafkaEvent({
+        userId: user?.id,
+        productId: data.id,
+        shopId: data.shopId || data.shop?.id || '',
+        action: 'product_view',
+        device: deviceInfo || '',
+        country: location?.country || '',
+        city: location?.city || '',
+      });
+    }
+  }, [data?.id, user?.id, deviceInfo, location?.country]);
 
   const images =
     data?.images && data.images.length > 0
