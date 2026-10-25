@@ -12,6 +12,7 @@ import {
   deleteProductById,
   restoreProduct,
   getProductById,
+  getFilteredProducts,
   editProduct,
 } from '../controller/product.controller';
 import { isAuthenticated } from '../../../../packages/middleware/isAuthenticated.middleware';
@@ -21,6 +22,8 @@ const router = Router();
 
 router.get('/get-categories', getCategories);
 router.get('/get-all-products', getAllProducts);
+router.get('/get-filtered-products', getFilteredProducts);
+router.get('/api/get-filtered-products', getFilteredProducts);
 
 router.post(
   '/create-discount-code',
@@ -59,6 +62,7 @@ router.post('/create-product', isAuthenticated, isSeller, createProduct);
 
 router.get('/get-products', isAuthenticated, isSeller, getProducts);
 router.get('/get-product/:id', getProductById);
+router.get('/api/get-product/:id', getProductById);
 router.put('/edit-product/:id', isAuthenticated, isSeller, editProduct);
 router.put('/update-product/:id', isAuthenticated, isSeller, editProduct);
 

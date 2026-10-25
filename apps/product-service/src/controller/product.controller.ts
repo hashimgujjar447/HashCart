@@ -617,9 +617,20 @@ export const getProductById = async (
       return next(new ValidationError('Product ID is required'));
     }
 
-    const product = await prisma.products.findUnique({
-      where: { id: id },
-      include: { images: true },
+    const isObjectId = /^[0-9a-fA-F]{24}$/.test(id);
+    const product = await prisma.products.findFirst({
+      where: isObjectId
+        ? { OR: [{ id }, { slug: id }], isDeleted: false }
+        : { slug: id, isDeleted: false },
+      include: {
+        images: true,
+        shop: {
+          include: {
+            avatar: true,
+            reviews: true,
+          },
+        },
+      },
     });
 
     if (!product) {
@@ -632,6 +643,128 @@ export const getProductById = async (
     });
   } catch (error) {
     next(error);
+  }
+};
+
+export const getFilteredProducts = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const {
+      priceRange = [0, 10000],
+      categories = [],
+      colors = [],
+      sizes = [],
+      page = 1,
+      limit = 12,
+      search,
+      brand,
+      sort,
+    } = req.query;
+
+    const parsedPriceRange =
+      typeof priceRange === 'string'
+        ? priceRange.split(',').map(Number)
+        : Array.isArray(priceRange)
+        ? priceRange.map(Number)
+        : [0, 10000];
+    const parsedPage = Number(page) || 1;
+    const parsedLimit = Number(limit) || 12;
+
+    const where: any = {
+      isDeleted: false,
+      status: 'Active',
+    };
+
+    if (
+      parsedPriceRange &&
+      parsedPriceRange.length === 2 &&
+      !isNaN(parsedPriceRange[0]) &&
+      !isNaN(parsedPriceRange[1])
+    ) {
+      where.sale_price = {
+        gte: parsedPriceRange[0],
+        lte: parsedPriceRange[1],
+      };
+    }
+
+    const parsedCategories =
+      typeof categories === 'string'
+        ? categories.split(',').filter(Boolean)
+        : Array.isArray(categories)
+        ? (categories as string[])
+        : [];
+    if (parsedCategories.length > 0) {
+      where.category = { in: parsedCategories };
+    }
+
+    const parsedColors =
+      typeof colors === 'string'
+        ? colors.split(',').filter(Boolean)
+        : Array.isArray(colors)
+        ? (colors as string[])
+        : [];
+    if (parsedColors.length > 0) {
+      where.colors = { hasSome: parsedColors };
+    }
+
+    const parsedSizes =
+      typeof sizes === 'string'
+        ? sizes.split(',').filter(Boolean)
+        : Array.isArray(sizes)
+        ? (sizes as string[])
+        : [];
+    if (parsedSizes.length > 0) {
+      where.sizes = { hasSome: parsedSizes };
+    }
+
+    if (search && typeof search === 'string') {
+      where.title = { contains: search, mode: 'insensitive' };
+    }
+
+    if (brand && typeof brand === 'string') {
+      where.brand = brand;
+    }
+
+    let orderBy: any = { createdAt: 'desc' };
+    if (sort === 'price-low-to-high') {
+      orderBy = { sale_price: 'asc' };
+    } else if (sort === 'price-high-to-low') {
+      orderBy = { sale_price: 'desc' };
+    } else if (sort === 'top-sales') {
+      orderBy = { totalSales: 'desc' };
+    }
+
+    const skip = (parsedPage - 1) * parsedLimit;
+    const [products, total] = await Promise.all([
+      prisma.products.findMany({
+        where,
+        skip,
+        take: parsedLimit,
+        include: {
+          images: true,
+          shop: {
+            include: {
+              avatar: true,
+            },
+          },
+        },
+        orderBy,
+      }),
+      prisma.products.count({ where }),
+    ]);
+
+    return res.status(200).json({
+      success: true,
+      products,
+      total,
+      totalPages: Math.ceil(total / parsedLimit),
+      currentPage: parsedPage,
+    });
+  } catch (error) {
+    return next(error);
   }
 };
 
