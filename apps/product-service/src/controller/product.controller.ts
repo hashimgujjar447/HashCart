@@ -4,6 +4,7 @@ import prisma from '../../../../packages/libs/prisma';
 
 import { NextFunction, Request, Response } from 'express';
 import imageKit from '../../../../packages/libs/imageKit';
+import { Prisma } from '../../../../generated/prisma';
 
 export const getCategories = async (
   req: Request,
@@ -381,6 +382,115 @@ export const getProducts = async (
     res.status(200).json({
       success: true,
       products: allProducts,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getAllProducts = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 20;
+    const skip = (page - 1) * limit;
+    const type = req.query.type as string;
+    const category = req.query.category as string;
+    const subCategory = req.query.subCategory as string;
+    const search = req.query.search as string;
+
+    const baseFilter: Prisma.productsWhereInput = {
+      isDeleted: false,
+      status: 'Active',
+      OR: [
+        {
+          starting_date: null,
+        },
+        {
+          ending_date: null,
+        },
+      ],
+    };
+
+    if (category) {
+      baseFilter.category = category;
+    }
+
+    if (subCategory) {
+      baseFilter.subCategory = subCategory;
+    }
+
+    if (search) {
+      baseFilter.OR = [
+        {
+          title: {
+            contains: search,
+            mode: 'insensitive',
+          },
+        },
+        {
+          description: {
+            contains: search,
+            mode: 'insensitive',
+          },
+        },
+      ];
+    }
+
+    let orderBy: Prisma.productsOrderByWithRelationInput = {
+      totalSales: 'desc',
+    };
+
+    if (type === 'latest') {
+      orderBy = { createdAt: 'desc' };
+    } else if (type === 'topSales') {
+      orderBy = { totalSales: 'desc' };
+    } else if (type === 'priceLowToHigh') {
+      orderBy = { sale_price: 'asc' };
+    } else if (type === 'priceHighToLow') {
+      orderBy = { sale_price: 'desc' };
+    }
+
+    const [products, total, top10Products] = await Promise.all([
+      prisma.products.findMany({
+        skip,
+        take: limit,
+        where: baseFilter,
+        include: {
+          images: true,
+          shop: true,
+        },
+        orderBy,
+      }),
+      prisma.products.count({
+        where: baseFilter,
+      }),
+      prisma.products.findMany({
+        take: 10,
+        where: {
+          isDeleted: false,
+          status: 'Active',
+        },
+        include: {
+          images: true,
+          shop: true,
+        },
+        orderBy: {
+          totalSales: 'desc',
+        },
+      }),
+    ]);
+
+    res.status(200).json({
+      success: true,
+      products,
+      total,
+      totalPages: Math.ceil(total / limit),
+      currentPage: page,
+      top10Products,
     });
   } catch (error) {
     next(error);

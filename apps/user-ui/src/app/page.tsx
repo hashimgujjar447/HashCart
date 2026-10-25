@@ -1,73 +1,99 @@
+import Hero from '@/shared/modules/Hero';
+import ProductCard from '@/shared/cards/product-card';
 import React from 'react';
+import Link from 'next/link';
+import { Sparkles, TrendingUp, Flame } from 'lucide-react';
 
-const page = () => {
+async function getProducts() {
+  try {
+    const res = await fetch(
+      `${process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:8080'}/product/get-all-products`,
+      { cache: 'no-store' },
+    );
+    if (!res.ok) return { products: [], top10Products: [] };
+    const data = await res.json();
+    return data;
+  } catch (error) {
+    return { products: [], top10Products: [] };
+  }
+}
+
+const page = async () => {
+  const data = await getProducts();
+  const products = data?.products || [];
+  const top10Products = data?.top10Products || [];
+
   return (
-    <div>
-      page Lorem ipsum dolor sit amet consectetur adipisicing elit. Sunt,
-      voluptate in? Ut non accusantium illum nesciunt culpa pariatur modi! Amet
-      nobis dicta voluptatum praesentium cumque, ullam esse eligendi repellat
-      nemo. Eos rerum suscipit ratione dolorum error consequatur nesciunt veniam
-      non qui sapiente aspernatur, id dolor saepe hic unde amet, recusandae
-      minus adipisci facere labore illo! Cupiditate placeat natus quaerat
-      consectetur? Atque exercitationem optio maiores cupiditate consequatur
-      autem minus ut, esse voluptatem fugit soluta molestiae? Deserunt saepe
-      unde voluptatum nulla inventore. Commodi quisquam, totam impedit ab odio
-      quidem amet iste vitae? Earum quidem obcaecati harum ea veniam ducimus
-      voluptatibus iusto, distinctio a sunt. Repellat, nostrum pariatur? Autem
-      sit iste nisi aperiam sunt modi. Modi necessitatibus quidem non culpa, est
-      voluptates perspiciatis. At, asperiores iste eum non voluptatibus,
-      cupiditate amet, quis dolores sunt assumenda officia? Doloribus qui
-      quaerat maxime sed eligendi modi vero itaque dicta repudiandae, ea tempora
-      nobis amet magni accusamus? Iste architecto quas laboriosam natus, animi
-      impedit repudiandae asperiores quaerat maiores in distinctio reiciendis
-      eveniet sequi nam corrupti provident minima. Error similique, mollitia vel
-      a esse recusandae deserunt aspernatur tempora? Dolorum consectetur
-      voluptate quidem magni! Mollitia quas nihil dolor quisquam harum, quasi
-      nisi odit quam dolorem magnam at nobis. Perferendis aspernatur
-      necessitatibus perspiciatis voluptatibus dignissimos recusandae corrupti
-      illo quisquam aperiam! Dolor blanditiis sequi ipsum at ad voluptas, libero
-      consequatur illum, aperiam quidem sapiente repellendus omnis quis corrupti
-      debitis veniam, eius earum quo similique? Nobis error, eos fuga ab
-      nesciunt doloribus. Adipisci, vitae odit. Impedit iste modi veritatis
-      saepe illum, a cumque possimus ab pariatur, repellendus error assumenda
-      veniam minus rerum quidem. Odit aliquam cumque exercitationem aspernatur
-      sed, voluptatibus fuga illum. Sequi quibusdam delectus nihil dicta
-      deserunt ad in quos voluptatum officia veritatis reprehenderit facilis
-      illo nam laborum corporis mollitia necessitatibus quasi, quod quam
-      similique cumque nesciunt repudiandae? Error, similique provident.
-      Eligendi, ad repudiandae! Blanditiis, corrupti quam minus consequuntur
-      reprehenderit cum, aliquam recusandae laborum ipsam inventore incidunt
-      cumque eum soluta maiores quaerat? Mollitia vitae molestiae voluptas
-      inventore qui voluptatem neque aut. Enim amet eveniet harum ipsum
-      voluptatum ea error doloremque beatae odit laborum. Rerum minus ipsum
-      labore corporis, aliquam voluptate necessitatibus vel incidunt? Totam
-      minus aliquam et odio id perferendis eveniet. Quod distinctio pariatur
-      praesentium, vero asperiores expedita magni numquam quaerat, sunt
-      excepturi labore voluptatibus recusandae aspernatur illum commodi beatae
-      fugit dolorem dolorum laborum, laudantium sequi reiciendis cumque magnam
-      neque! Reiciendis! Assumenda magni accusamus, beatae rerum eveniet soluta
-      obcaecati at fugiat nulla eius sunt deleniti, excepturi maiores odit
-      praesentium optio enim molestiae maxime doloribus aut, magnam minima
-      explicabo? Recusandae, officiis voluptas! Facilis explicabo suscipit,
-      cumque aperiam repudiandae fugiat dolorem distinctio excepturi deserunt
-      iste perspiciatis dolor modi harum atque! Dignissimos tempora sint,
-      consequuntur ex sed officiis, eum, reiciendis facilis vel animi porro!
-      Error nostrum mollitia sed inventore quisquam! Tempore doloribus magnam
-      ipsa, tenetur porro distinctio. Id eveniet iure quos eligendi enim!
-      Repellendus, maxime! Aut ratione aliquid aspernatur commodi, laborum
-      molestias voluptates architecto! Blanditiis magnam hic totam odit! Neque,
-      possimus totam? Minima, hic magni perferendis maiores vero cumque, placeat
-      adipisci iusto amet ex esse non itaque qui aut delectus repellendus est
-      quo expedita! Quae ullam iusto ipsa harum, est omnis. Placeat, officia. Ab
-      odit eos voluptatum voluptate aperiam nobis, excepturi ratione pariatur ad
-      ipsa blanditiis! Numquam porro facilis, architecto omnis corrupti aut
-      quibusdam? Et sequi ipsa natus temporibus ad facere soluta cupiditate.
-      Nulla beatae, ullam soluta maxime quidem quo reiciendis nihil hic quam
-      qui, ipsam laboriosam accusamus. Eaque corrupti deleniti exercitationem
-      distinctio earum? Fugiat animi quaerat delectus repellendus in corporis
-      explicabo, fuga maiores facilis voluptas vel nisi tempora nemo deserunt
-      velit iure consectetur pariatur porro eius. Nostrum illo, dolore ducimus
-      consequatur earum mollitia.
+    <div className="bg-[#f8f9fa] min-h-screen">
+      <Hero />
+      <div className="md:w-[85%] w-[92%] max-w-7xl my-14 m-auto">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
+          <div>
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-50 text-blue-600 text-xs font-semibold mb-2">
+              <Sparkles className="w-3.5 h-3.5" />
+              Curated Selection
+            </div>
+            <h2 className="text-2xl md:text-3xl font-extrabold text-gray-900 tracking-tight">
+              Featured Products
+            </h2>
+            <p className="text-sm text-gray-500 mt-1">
+              Explore handpicked, high quality items from top verified sellers
+            </p>
+          </div>
+          {products.length > 0 && (
+            <Link
+              href="/products"
+              className="text-sm font-semibold text-blue-600 hover:text-blue-700 hover:underline inline-flex items-center gap-1 self-start sm:self-auto"
+            >
+              View all products &rarr;
+            </Link>
+          )}
+        </div>
+
+        {products.length === 0 ? (
+          <div className="bg-white rounded-2xl border border-gray-100 p-12 text-center shadow-xs">
+            <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-gray-50 flex items-center justify-center text-gray-400">
+              <Flame className="w-8 h-8 text-amber-500" />
+            </div>
+            <h3 className="text-lg font-bold text-gray-800">
+              No products found yet
+            </h3>
+            <p className="text-sm text-gray-500 mt-1 max-w-md mx-auto">
+              Check back soon! New products and top deals are being added by sellers daily.
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-5 gap-6">
+            {products.map((product: any) => (
+              <ProductCard key={product.id} product={product} />
+            ))}
+          </div>
+        )}
+
+        {top10Products.length > 0 && (
+          <div className="mt-16">
+            <div className="flex items-center gap-2 mb-6">
+              <div className="p-2 rounded-xl bg-amber-50 text-amber-600">
+                <TrendingUp className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-xl md:text-2xl font-extrabold text-gray-900">
+                  Best Sellers
+                </h3>
+                <p className="text-xs text-gray-500">
+                  Top performing items loved by customers
+                </p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-5 gap-6">
+              {top10Products.map((product: any) => (
+                <ProductCard key={`top-${product.id}`} product={product} />
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 };

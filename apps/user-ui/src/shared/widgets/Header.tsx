@@ -5,7 +5,7 @@ import HeaderBottom from './header/header-bottom';
 import { useUser } from '@/hooks/useUser';
 
 const Header = () => {
-  const { user, isLoading, isError, refetch } = useUser();
+  const { user, isLoading } = useUser();
   return (
     <header className="w-full bg-white border-b border-gray-100 shadow-xs  z-50">
       <div className="w-[88%] max-w-7xl mx-auto py-3.5 flex items-center justify-between gap-6">

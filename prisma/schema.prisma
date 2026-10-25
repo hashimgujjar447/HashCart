@@ -138,6 +138,7 @@ model products {
   shopId              String?  @db.ObjectId
   status              productStatus @default(Active)
   ratings            Float    @default(5)
+  totalSales         Int      @default(0)
   starting_date       DateTime?
   ending_date         DateTime?
   isDeleted           Boolean  @default(false)

@@ -8,6 +8,7 @@ import {
   getDiscountCodes,
   uploadProductImage,
   getProducts,
+  getAllProducts,
   deleteProductById,
   restoreProduct,
   getProductById,
@@ -19,6 +20,7 @@ import { isSeller } from '../../../../packages/middleware/authorizeRoles';
 const router = Router();
 
 router.get('/get-categories', getCategories);
+router.get('/get-all-products', getAllProducts);
 
 router.post(
   '/create-discount-code',
