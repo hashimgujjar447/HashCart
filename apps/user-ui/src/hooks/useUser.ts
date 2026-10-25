@@ -23,3 +23,5 @@ export const useUser = () => {
 
   return { user, isLoading, isError, refetch };
 };
+
+export default useUser;

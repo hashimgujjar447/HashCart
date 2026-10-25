@@ -50,6 +50,20 @@ type Store = {
     location?: any,
     deviceInfo?: any,
   ) => void;
+  updateWishlistQuantity: (
+    id: string,
+    type: 'increase' | 'decrease' | number,
+  ) => void;
+  updateWishListQuantity: (
+    id: string,
+    type: 'increase' | 'decrease' | number,
+  ) => void;
+  increaseWishlistQuantity: (id: string) => void;
+  decreaseWishlistQuantity: (id: string) => void;
+  updateCartQuantity: (
+    id: string,
+    type: 'increase' | 'decrease' | number,
+  ) => void;
 };
 
 export const useStore = create<Store>()(
@@ -63,7 +77,10 @@ export const useStore = create<Store>()(
       ) => {
         const isExist = get().wishlist.find((item) => item.id === product.id);
         if (!isExist) {
-          const updated = [...get().wishlist, product];
+          const updated = [
+            ...get().wishlist,
+            { ...product, quantity: product.quantity || 1 },
+          ];
           set({
             wishlist: updated,
             wishList: updated,
@@ -84,31 +101,72 @@ export const useStore = create<Store>()(
         });
       };
 
+      const updateWishlistQuantity = (
+        id: string,
+        type: 'increase' | 'decrease' | number,
+      ) => {
+        const updated = get().wishlist.map((item) => {
+          if (item.id === id) {
+            let newQty = item.quantity || 1;
+            if (typeof type === 'number') {
+              newQty = type;
+            } else if (type === 'increase') {
+              newQty += 1;
+            } else if (type === 'decrease') {
+              newQty = Math.max(1, newQty - 1);
+            }
+            return { ...item, quantity: Math.max(1, newQty) };
+          }
+          return item;
+        });
+
+        set({
+          wishlist: updated,
+          wishList: updated,
+        });
+      };
+
+      const updateCartQuantity = (
+        id: string,
+        type: 'increase' | 'decrease' | number,
+      ) => {
+        const updated = get().cart.map((item) => {
+          if (item.id === id) {
+            let newQty = item.quantity || 1;
+            if (typeof type === 'number') {
+              newQty = type;
+            } else if (type === 'increase') {
+              newQty += 1;
+            } else if (type === 'decrease') {
+              newQty = Math.max(1, newQty - 1);
+            }
+            return { ...item, quantity: Math.max(1, newQty) };
+          }
+          return item;
+        });
+
+        set({
+          cart: updated,
+        });
+      };
+
       return {
         cart: [],
         wishlist: [],
         wishList: [],
         addToCart: (product, user, location, deviceInfo) => {
-          const existingProduct = get().cart.find(
-            (item) => item.id === product.id,
-          );
+          const existingProduct = get().cart.find((item) => item.id === product.id);
           if (existingProduct) {
             set({
               cart: get().cart.map((item) =>
                 item.id === product.id
-                  ? {
-                      ...item,
-                      quantity: (item.quantity || 1) + (product.quantity || 1),
-                    }
+                  ? { ...item, quantity: (item.quantity || 1) + (product.quantity || 1) }
                   : item,
               ),
             });
           } else {
             set({
-              cart: [
-                ...get().cart,
-                { ...product, quantity: product.quantity || 1 },
-              ],
+              cart: [...get().cart, { ...product, quantity: product.quantity || 1 }],
             });
           }
         },
@@ -121,6 +179,13 @@ export const useStore = create<Store>()(
         addToWishList: addToWishlist,
         removeFromWishlist,
         removeFromWishList: removeFromWishlist,
+        updateWishlistQuantity,
+        updateWishListQuantity: updateWishlistQuantity,
+        increaseWishlistQuantity: (id: string) =>
+          updateWishlistQuantity(id, 'increase'),
+        decreaseWishlistQuantity: (id: string) =>
+          updateWishlistQuantity(id, 'decrease'),
+        updateCartQuantity,
       };
     },
     {
