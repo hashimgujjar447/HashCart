@@ -405,14 +405,6 @@ export const getAllProducts = async (
     const baseFilter: Prisma.productsWhereInput = {
       isDeleted: false,
       status: 'Active',
-      OR: [
-        {
-          starting_date: null,
-        },
-        {
-          ending_date: null,
-        },
-      ],
     };
 
     if (category) {
