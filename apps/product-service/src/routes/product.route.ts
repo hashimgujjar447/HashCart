@@ -14,6 +14,9 @@ import {
   getProductById,
   getFilteredProducts,
   editProduct,
+  getOfferProducts,
+  getAllShops,
+  getShopById,
 } from '../controller/product.controller';
 import { isAuthenticated } from '../../../../packages/middleware/isAuthenticated.middleware';
 import { isSeller } from '../../../../packages/middleware/authorizeRoles';
@@ -24,6 +27,11 @@ router.get('/get-categories', getCategories);
 router.get('/get-all-products', getAllProducts);
 router.get('/get-filtered-products', getFilteredProducts);
 router.get('/api/get-filtered-products', getFilteredProducts);
+router.get('/get-offer-products', getOfferProducts);
+router.get('/api/get-offer-products', getOfferProducts);
+router.get('/get-discounted-products', getOfferProducts);
+router.get('/get-all-shops', getAllShops);
+router.get('/get-shop/:id', getShopById);
 
 router.post(
   '/create-discount-code',

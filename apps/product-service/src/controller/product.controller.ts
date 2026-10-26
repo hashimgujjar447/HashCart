@@ -953,3 +953,334 @@ export const editProduct = async (
     next(error);
   }
 };
+
+export const getOfferProducts = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const {
+      priceRange = [0, 10000],
+      categories = [],
+      colors = [],
+      sizes = [],
+      page = 1,
+      limit = 12,
+      search,
+      brand,
+      sort,
+    } = req.query;
+
+    const parsedPriceRange =
+      typeof priceRange === 'string'
+        ? priceRange.split(',').map(Number)
+        : Array.isArray(priceRange)
+        ? priceRange.map(Number)
+        : [0, 10000];
+    const parsedPage = Number(page) || 1;
+    const parsedLimit = Number(limit) || 12;
+
+    const where: any = {
+      isDeleted: false,
+      status: 'Active',
+      OR: [
+        {
+          regular_price: { gt: 0 },
+        },
+        {
+          discountCodes: { isEmpty: false },
+        },
+        {
+          ending_date: { not: null },
+        },
+      ],
+    };
+
+    if (
+      parsedPriceRange &&
+      parsedPriceRange.length === 2 &&
+      !isNaN(parsedPriceRange[0]) &&
+      !isNaN(parsedPriceRange[1])
+    ) {
+      where.sale_price = {
+        gte: parsedPriceRange[0],
+        lte: parsedPriceRange[1],
+      };
+    }
+
+    const parsedCategories =
+      typeof categories === 'string'
+        ? categories.split(',').filter(Boolean)
+        : Array.isArray(categories)
+        ? (categories as string[])
+        : [];
+    if (parsedCategories.length > 0) {
+      where.category = { in: parsedCategories };
+    }
+
+    const parsedColors =
+      typeof colors === 'string'
+        ? colors.split(',').filter(Boolean)
+        : Array.isArray(colors)
+        ? (colors as string[])
+        : [];
+    if (parsedColors.length > 0) {
+      where.colors = { hasSome: parsedColors };
+    }
+
+    const parsedSizes =
+      typeof sizes === 'string'
+        ? sizes.split(',').filter(Boolean)
+        : Array.isArray(sizes)
+        ? (sizes as string[])
+        : [];
+    if (parsedSizes.length > 0) {
+      where.sizes = { hasSome: parsedSizes };
+    }
+
+    if (search && typeof search === 'string') {
+      where.title = { contains: search, mode: 'insensitive' };
+    }
+
+    if (brand && typeof brand === 'string') {
+      where.brand = brand;
+    }
+
+    let orderBy: any = { createdAt: 'desc' };
+    if (sort === 'price-low-to-high') {
+      orderBy = { sale_price: 'asc' };
+    } else if (sort === 'price-high-to-low') {
+      orderBy = { sale_price: 'desc' };
+    } else if (sort === 'top-sales') {
+      orderBy = { totalSales: 'desc' };
+    }
+
+    const candidates = await prisma.products.findMany({
+      where,
+      include: {
+        images: true,
+        shop: {
+          include: {
+            avatar: true,
+          },
+        },
+      },
+      orderBy,
+    });
+
+    const offerProducts = candidates.filter((product) => {
+      const hasDiscountPrice =
+        product.regular_price != null &&
+        product.regular_price > product.sale_price;
+      const hasDiscountCodes =
+        Array.isArray(product.discountCodes) &&
+        product.discountCodes.length > 0;
+      const hasOfferDate = product.ending_date != null;
+      return hasDiscountPrice || hasDiscountCodes || hasOfferDate;
+    });
+
+    const total = offerProducts.length;
+    const skip = (parsedPage - 1) * parsedLimit;
+    const paginatedProducts = offerProducts.slice(skip, skip + parsedLimit);
+
+    return res.status(200).json({
+      success: true,
+      products: paginatedProducts,
+      total,
+      totalPages: Math.ceil(total / parsedLimit) || 1,
+      currentPage: parsedPage,
+    });
+  } catch (error) {
+    return next(error);
+  }
+};
+
+export const getAllShops = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const {
+      categories,
+      category,
+      search,
+      page = 1,
+      limit = 24,
+      sort,
+    } = req.query;
+
+    const parsedPage = Number(page) || 1;
+    const parsedLimit = Number(limit) || 24;
+    const skip = (parsedPage - 1) * parsedLimit;
+
+    const rawCats = categories || category;
+    const parsedCategories: string[] =
+      typeof rawCats === 'string'
+        ? rawCats
+            .split(',')
+            .map((c) => c.trim())
+            .filter(Boolean)
+        : Array.isArray(rawCats)
+        ? (rawCats as string[]).map((c) => String(c).trim()).filter(Boolean)
+        : [];
+
+    const where: any = {};
+
+    if (parsedCategories.length > 0) {
+      where.OR = parsedCategories.map((cat) => ({
+        category: { contains: cat, mode: 'insensitive' },
+      }));
+    }
+
+    if (search && typeof search === 'string' && search.trim()) {
+      const term = search.trim();
+      const searchConditions = [
+        { name: { contains: term, mode: 'insensitive' } },
+        { bio: { contains: term, mode: 'insensitive' } },
+        { address: { contains: term, mode: 'insensitive' } },
+        { category: { contains: term, mode: 'insensitive' } },
+      ];
+
+      if (where.OR) {
+        where.AND = [{ OR: where.OR }, { OR: searchConditions }];
+        delete where.OR;
+      } else {
+        where.OR = searchConditions;
+      }
+    }
+
+    let orderBy: any = { createdAt: 'desc' };
+    if (sort === 'ratings') {
+      orderBy = { ratings: 'desc' };
+    } else if (sort === 'oldest') {
+      orderBy = { createdAt: 'asc' };
+    }
+
+    const [shopsList, total] = await Promise.all([
+      prisma.shops.findMany({
+        where,
+        skip,
+        take: parsedLimit,
+        include: {
+          avatar: true,
+          reviews: true,
+          sellers: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+            },
+          },
+        },
+        orderBy,
+      }),
+      prisma.shops.count({ where }),
+    ]);
+
+    const enhancedShops = await Promise.all(
+      shopsList.map(async (shop) => {
+        const followersCount = await prisma.users.count({
+          where: {
+            following: {
+              has: shop.id,
+            },
+          },
+        });
+
+        const totalReviews = shop.reviews?.length || 0;
+        const avgRating =
+          totalReviews > 0
+            ? shop.reviews.reduce((acc, curr) => acc + curr.rating, 0) /
+              totalReviews
+            : shop.ratings || 0;
+
+        return {
+          ...shop,
+          followersCount,
+          ratings: avgRating,
+        };
+      }),
+    );
+
+    return res.status(200).json({
+      success: true,
+      shops: enhancedShops,
+      total,
+      totalPages: Math.ceil(total / parsedLimit) || 1,
+      currentPage: parsedPage,
+    });
+  } catch (error) {
+    return next(error);
+  }
+};
+
+export const getShopById = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const { id } = req.params;
+    if (!id) {
+      return next(new ValidationError('Shop ID is required'));
+    }
+
+    const shop = await prisma.shops.findUnique({
+      where: { id },
+      include: {
+        avatar: true,
+        reviews: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                name: true,
+                avatar: true,
+              },
+            },
+          },
+        },
+        sellers: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
+        products: {
+          where: {
+            isDeleted: false,
+            status: 'Active',
+          },
+          include: {
+            images: true,
+          },
+        },
+      },
+    });
+
+    if (!shop) {
+      return next(new ValidationError('Shop not found'));
+    }
+
+    const followersCount = await prisma.users.count({
+      where: {
+        following: {
+          has: shop.id,
+        },
+      },
+    });
+
+    return res.status(200).json({
+      success: true,
+      shop: {
+        ...shop,
+        followersCount,
+      },
+    });
+  } catch (error) {
+    return next(error);
+  }
+};

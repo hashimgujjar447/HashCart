@@ -16,6 +16,8 @@ import {
   getSeller,
   sellerForgetPassword,
   resetSellerPassword,
+  getAllShops,
+  getShopById,
 } from '../controller/auth.controller';
 import { isAuthenticated } from '../../../../packages/middleware/isAuthenticated.middleware';
 
@@ -47,5 +49,8 @@ router.post('/forgot-password-seller', sellerForgetPassword);
 router.post('/reset-password-seller', resetSellerPassword);
 router.post('/seller-forgot-password', sellerForgetPassword);
 router.post('/seller-reset-password', resetSellerPassword);
+
+router.get("/get-all-shops", getAllShops);
+router.get("/get-shop/:id", getShopById);
 
 export default router;

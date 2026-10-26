@@ -48,6 +48,7 @@ app.get('/api-gateway-health', (req, res) => {
 
 app.use('/auth', proxy('http://localhost:6001'));
 app.use('/product', proxy('http://localhost:6002'));
+app.use('/shop', proxy('http://localhost:6001'));
 
 app.use(errorMiddleware);
 

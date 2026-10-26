@@ -657,3 +657,193 @@ export const resetSellerPassword = async (
     return next(error);
   }
 };
+
+
+export const getAllShops = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const {
+      categories,
+      category,
+      search,
+      page = 1,
+      limit = 24,
+      sort,
+    } = req.query;
+
+    const parsedPage = Number(page) || 1;
+    const parsedLimit = Number(limit) || 24;
+    const skip = (parsedPage - 1) * parsedLimit;
+
+    const rawCats = categories || category;
+    const parsedCategories: string[] =
+      typeof rawCats === 'string'
+        ? rawCats
+            .split(',')
+            .map((c) => c.trim())
+            .filter(Boolean)
+        : Array.isArray(rawCats)
+        ? (rawCats as string[]).map((c) => String(c).trim()).filter(Boolean)
+        : [];
+
+    const where: any = {};
+
+    if (parsedCategories.length > 0) {
+      where.OR = parsedCategories.map((cat) => ({
+        category: { contains: cat, mode: 'insensitive' },
+      }));
+    }
+
+    if (search && typeof search === 'string' && search.trim()) {
+      const term = search.trim();
+      const searchConditions = [
+        { name: { contains: term, mode: 'insensitive' } },
+        { bio: { contains: term, mode: 'insensitive' } },
+        { address: { contains: term, mode: 'insensitive' } },
+        { category: { contains: term, mode: 'insensitive' } },
+      ];
+
+      if (where.OR) {
+        where.AND = [{ OR: where.OR }, { OR: searchConditions }];
+        delete where.OR;
+      } else {
+        where.OR = searchConditions;
+      }
+    }
+
+    let orderBy: any = { createdAt: 'desc' };
+    if (sort === 'ratings') {
+      orderBy = { ratings: 'desc' };
+    } else if (sort === 'oldest') {
+      orderBy = { createdAt: 'asc' };
+    }
+
+    const [shopsList, total] = await Promise.all([
+      prisma.shops.findMany({
+        where,
+        skip,
+        take: parsedLimit,
+        include: {
+          avatar: true,
+          reviews: true,
+          sellers: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+            },
+          },
+        },
+        orderBy,
+      }),
+      prisma.shops.count({ where }),
+    ]);
+
+    const enhancedShops = await Promise.all(
+      shopsList.map(async (shop) => {
+        const followersCount = await prisma.users.count({
+          where: {
+            following: {
+              has: shop.id,
+            },
+          },
+        });
+
+        const totalReviews = shop.reviews?.length || 0;
+        const avgRating =
+          totalReviews > 0
+            ? shop.reviews.reduce((acc, curr) => acc + curr.rating, 0) /
+              totalReviews
+            : shop.ratings || 0;
+
+        return {
+          ...shop,
+          followersCount,
+          ratings: avgRating,
+        };
+      }),
+    );
+
+    return res.status(200).json({
+      success: true,
+      shops: enhancedShops,
+      total,
+      totalPages: Math.ceil(total / parsedLimit) || 1,
+      currentPage: parsedPage,
+    });
+  } catch (error) {
+    return next(error);
+  }
+};
+
+export const getShopById = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const { id } = req.params;
+    if (!id) {
+      return next(new ValidationError('Shop ID is required'));
+    }
+
+    const shop = await prisma.shops.findUnique({
+      where: { id },
+      include: {
+        avatar: true,
+        reviews: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                name: true,
+                avatar: true,
+              },
+            },
+          },
+        },
+        sellers: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
+        products: {
+          where: {
+            isDeleted: false,
+            status: 'Active',
+          },
+          include: {
+            images: true,
+          },
+        },
+      },
+    });
+
+    if (!shop) {
+      return next(new ValidationError('Shop not found'));
+    }
+
+    const followersCount = await prisma.users.count({
+      where: {
+        following: {
+          has: shop.id,
+        },
+      },
+    });
+
+    return res.status(200).json({
+      success: true,
+      shop: {
+        ...shop,
+        followersCount,
+      },
+    });
+  } catch (error) {
+    return next(error);
+  }
+};
