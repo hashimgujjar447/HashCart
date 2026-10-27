@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { useStore } from '@/store';
 
 const axiosInstance = axios.create({
   baseURL: process.env.NEXT_PUBLIC_SERVER_URL,
@@ -9,7 +10,9 @@ let refreshing = false;
 let refreshSubscribers: (() => void)[] = [];
 
 const handleLogout = () => {
-  if (window.location.pathname !== '/login') {
+  // Clear Zustand user state on definitive auth failure
+  useStore.getState().clearUser();
+  if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
     window.location.href = '/login';
   }
 };
@@ -43,6 +46,15 @@ axiosInstance.interceptors.response.use(
       `[Axios Response Interceptor] Error received: status ${status}`,
       error.config?.url,
     );
+
+    // Don't try to refresh for auth-checking or refresh endpoints — let them fail silently
+    const url = originalRequest?.url || '';
+    const isAuthCheckEndpoint =
+      url.includes('/auth/logged-in-user') ||
+      url.includes('/auth/refresh-token');
+    if (isAuthCheckEndpoint) {
+      return Promise.reject(error);
+    }
 
     if ((status === 401 || status === 500) && !originalRequest._retry) {
       if (refreshing) {

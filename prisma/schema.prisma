@@ -28,15 +28,53 @@ model images {
 }
 
 model users {
-  id        String        @id @default(auto()) @map("_id") @db.ObjectId
+  id           String        @id @default(auto()) @map("_id") @db.ObjectId
+  name         String
+  email        String        @unique
+  avatar       images?
+  following    String[]
+  password     String?
+  phone_number String?
+  reviews      shopReviews[]
+  addresses    addresses[]
+  orders       orders[]
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+}
+
+model addresses {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId    String   @db.ObjectId
+  user      users    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String   @default("Home")
   name      String
-  email     String        @unique
-  avatar    images?
-  following String[]
-  password  String?
-  reviews   shopReviews[]
-  createdAt DateTime      @default(now())
-  updatedAt DateTime      @updatedAt
+  street    String
+  city      String
+  zipCode   String
+  country   String
+  isDefault Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+enum orderStatus {
+  Processing
+  Completed
+  Cancelled
+  Delivered
+}
+
+model orders {
+  id              String      @id @default(auto()) @map("_id") @db.ObjectId
+  userId          String      @db.ObjectId
+  user            users       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  shopId          String?     @db.ObjectId
+  totalAmount     Float
+  status          orderStatus @default(Processing)
+  items           Json[]
+  shippingAddress Json?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
 }
 
 model shopReviews {

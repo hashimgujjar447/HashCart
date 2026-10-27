@@ -34,10 +34,10 @@ const ShopCard: React.FC<ShopCardProps> = ({ shop }) => {
   const coverUrl = shop?.coverBanner;
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200/90 shadow-xs hover:shadow-lg transition-all duration-300 overflow-hidden flex flex-col justify-between group">
+    <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs hover:shadow-md transition-all duration-300 overflow-hidden flex flex-col justify-between group">
       <div>
         {/* Cover Banner */}
-        <div className="w-full h-[120px] relative overflow-hidden bg-gradient-to-r from-slate-900 via-purple-900 to-indigo-900">
+        <div className="w-full h-[110px] relative overflow-hidden bg-gradient-to-r from-slate-800 via-slate-700 to-slate-800">
           {coverUrl ? (
             <img
               src={coverUrl}
@@ -45,15 +45,15 @@ const ShopCard: React.FC<ShopCardProps> = ({ shop }) => {
               className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
             />
           ) : (
-            <div className="w-full h-full flex items-center justify-center bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 opacity-90 group-hover:scale-105 transition-transform duration-500">
-              <Store className="text-white/40" size={42} />
+            <div className="w-full h-full flex items-center justify-center bg-gradient-to-r from-slate-800 via-slate-700 to-slate-900 opacity-90 group-hover:scale-105 transition-transform duration-500">
+              <Store className="text-white/30" size={38} />
             </div>
           )}
         </div>
 
         {/* Circular Avatar */}
         <div className="relative -mt-9 flex justify-center px-4">
-          <div className="w-[72px] h-[72px] rounded-full border-4 border-white shadow-md overflow-hidden bg-white flex items-center justify-center shrink-0">
+          <div className="w-16 h-16 rounded-full border-4 border-white shadow-sm overflow-hidden bg-white flex items-center justify-center shrink-0">
             {avatarUrl ? (
               <img
                 src={avatarUrl}
@@ -61,7 +61,7 @@ const ShopCard: React.FC<ShopCardProps> = ({ shop }) => {
                 className="w-full h-full object-cover"
               />
             ) : (
-              <div className="w-full h-full bg-gradient-to-tr from-purple-600 to-indigo-500 flex items-center justify-center text-white font-bold text-xl uppercase">
+              <div className="w-full h-full bg-gradient-to-tr from-slate-700 to-slate-800 flex items-center justify-center text-white font-bold text-lg uppercase">
                 {shop.name?.charAt(0) || 'S'}
               </div>
             )}
@@ -69,43 +69,43 @@ const ShopCard: React.FC<ShopCardProps> = ({ shop }) => {
         </div>
 
         {/* Shop Details */}
-        <div className="px-5 pt-3 pb-2 text-center">
+        <div className="px-5 pt-2.5 pb-2 text-center">
           <Link href={`/shop/${shop.id}`}>
             <h3
-              className="font-bold text-gray-900 text-base hover:text-blue-600 transition-colors line-clamp-1"
+              className="font-bold text-slate-900 text-sm sm:text-base hover:text-blue-600 transition-colors line-clamp-1"
               title={shop.name}
             >
               {shop.name}
             </h3>
           </Link>
 
-          <p className="text-xs text-gray-500 font-medium mt-0.5">
+          <p className="text-[11px] text-slate-400 font-medium mt-0.5">
             {shop.followersCount ?? 0} Followers
           </p>
 
           {/* Location & Rating */}
-          <div className="flex items-center justify-center gap-3 mt-3 text-xs text-gray-600 flex-wrap">
+          <div className="flex items-center justify-center gap-2.5 mt-2.5 text-xs text-slate-500 flex-wrap">
             <div
-              className="flex items-center gap-1 max-w-[140px] truncate"
+              className="flex items-center gap-1 max-w-[130px] truncate"
               title={shop.address}
             >
-              <MapPin size={13} className="text-gray-400 shrink-0" />
-              <span className="truncate">{shop.address || 'No address'}</span>
+              <MapPin size={12} className="text-slate-400 shrink-0" />
+              <span className="truncate text-[11px]">{shop.address || 'Verified Store'}</span>
             </div>
 
             <div className="flex items-center gap-1 shrink-0">
-              <Star size={13} className="text-amber-400 fill-amber-400" />
-              <span className="font-semibold text-gray-700">
+              <Star size={12} className="text-amber-400 fill-amber-400" />
+              <span className="font-semibold text-slate-700 text-[11px]">
                 {shop.ratings && shop.ratings > 0
-                  ? shop.ratings.toFixed(1)
-                  : 'N/A'}
+                  ? Number(shop.ratings).toFixed(1)
+                  : '5.0'}
               </span>
             </div>
           </div>
 
           {/* Category */}
-          <div className="mt-2.5">
-            <span className="text-xs font-semibold text-blue-600 hover:text-blue-700 transition-colors">
+          <div className="mt-2">
+            <span className="inline-block text-[10px] font-semibold text-blue-700 bg-blue-50/80 px-2 py-0.5 rounded-full border border-blue-100">
               {shop.category || 'General'}
             </span>
           </div>
@@ -113,13 +113,13 @@ const ShopCard: React.FC<ShopCardProps> = ({ shop }) => {
       </div>
 
       {/* Action: Visit Shop */}
-      <div className="px-5 pb-4 pt-3 border-t border-gray-100 mt-2 text-center">
+      <div className="px-5 pb-3.5 pt-2.5 border-t border-slate-100 mt-2 text-center">
         <Link
           href={`/shop/${shop.id}`}
-          className="inline-flex items-center justify-center gap-1.5 text-blue-600 hover:text-blue-700 font-semibold text-xs tracking-wide group-hover:translate-x-0.5 transition-all"
+          className="inline-flex items-center justify-center gap-1 text-blue-600 hover:text-blue-700 font-semibold text-xs tracking-wide group-hover:translate-x-0.5 transition-all"
         >
           <span>Visit Shop</span>
-          <ArrowUpRight size={14} className="shrink-0" />
+          <ArrowUpRight size={13} className="shrink-0" />
         </Link>
       </div>
     </div>

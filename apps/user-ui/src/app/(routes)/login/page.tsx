@@ -1,36 +1,64 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, Suspense } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { useMutation } from '@tanstack/react-query';
-import axios from 'axios';
+import axiosInstance from '@/utils/axiosInstance';
+import { useStore } from '@/store';
 
 type FormData = {
   email: string;
   password: string;
 };
 
-const LoginPage = () => {
+const LoginForm = () => {
   const [passwordVisible, setPasswordVisible] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
 
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const redirectUrl = searchParams.get('redirect');
 
   const loginMutation = useMutation({
     mutationFn: async (data: FormData) => {
-      const response = await axios.post(
-        `${process.env.NEXT_PUBLIC_SERVER_URL}/auth/login`,
-        data,
-      );
+      const response = await axiosInstance.post('/auth/login', data);
       return response.data;
     },
-    onSuccess: (data) => {
+    onSuccess: async (data: any) => {
       console.log('User logged in successfully:', data);
-      setServerError(null); // Clear any previous error
-      router.push('/');
+      setServerError(null);
+
+      // Immediately save user into Zustand store
+      if (data?.user) {
+        useStore.getState().setUser(data.user);
+      }
+
+      // Check if user has added a shipping address
+      try {
+        const addressRes = await axiosInstance.get('/auth/get-addresses');
+        const addresses = addressRes.data?.addresses || [];
+        if (addresses.length === 0) {
+          // No address found, guide user to complete shipping address first
+          const targetUrl = redirectUrl
+            ? `/profile?tab=address&notice=add_address&redirect=${encodeURIComponent(
+                redirectUrl,
+              )}`
+            : '/profile?tab=address&notice=add_address';
+          router.push(targetUrl);
+          return;
+        }
+      } catch (err) {
+        console.warn('Address check after login failed:', err);
+      }
+
+      if (redirectUrl) {
+        router.push(redirectUrl);
+      } else {
+        router.push('/');
+      }
     },
     onError: (error: any) => {
       console.error(
@@ -41,7 +69,6 @@ const LoginPage = () => {
         error.response?.data?.message || 'An error occurred during login',
       );
     },
-    // Handle error, e.g., show a notification or set an error state
   });
 
   const {
@@ -230,4 +257,13 @@ const LoginPage = () => {
   );
 };
 
+const LoginPage = () => {
+  return (
+    <Suspense fallback={<div className="w-full min-h-[85vh] bg-[#f5f5f5] flex items-center justify-center font-poppins text-gray-400 text-sm">Loading...</div>}>
+      <LoginForm />
+    </Suspense>
+  );
+};
+
 export default LoginPage;
+

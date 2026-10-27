@@ -34,6 +34,8 @@ export const isAuthenticated = async (
           id: true,
           email: true,
           name: true,
+          phone_number: true,
+          avatar: true,
           following: true,
           createdAt: true,
           updatedAt: true,

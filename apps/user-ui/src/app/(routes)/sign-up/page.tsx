@@ -65,7 +65,7 @@ const RegisterPage = () => {
       );
       return response.data;
     },
-    onSuccess: (_, formData) => {
+    onSuccess: (_: any, formData: any) => {
       setServerError(null);
       setUserData(formData);
       setShowOtp(true);

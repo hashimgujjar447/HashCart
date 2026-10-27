@@ -14,6 +14,7 @@ import { useUser } from '@/hooks/useUser';
 import { useLocationTracking } from '@/hooks/useLocation';
 import { useDevice } from '@/hooks/useDevice';
 import { sendKafkaEvent } from '@/actions/track-user';
+import LoginRequiredModal from '@/shared/components/modals/login-required-modal';
 
 interface ProductDetailsCardProps {
   data: any;
@@ -29,6 +30,7 @@ const ProductDetailsCard: React.FC<ProductDetailsCardProps> = ({
   const [selectedSize, setSelectedSize] = useState<string>(
     data?.sizes && data.sizes.length > 0 ? data.sizes[0] : '',
   );
+  const [showLoginModal, setShowLoginModal] = useState<boolean>(false);
 
   const { user } = useUser();
   const location = useLocationTracking();
@@ -85,6 +87,10 @@ const ProductDetailsCard: React.FC<ProductDetailsCardProps> = ({
 
   const handleAddToCart = () => {
     if (data) {
+      if (!user) {
+        setShowLoginModal(true);
+        return;
+      }
       addToCart(
         {
           id: data.id,
@@ -108,7 +114,7 @@ const ProductDetailsCard: React.FC<ProductDetailsCardProps> = ({
       onClick={() => setOpen(false)}
     >
       <div
-        className="w-[90%] md:w-[75%] lg:w-[65%] max-w-4xl max-h-[90vh] overflow-y-auto bg-white rounded-xl shadow-2xl relative p-6 sm:p-8"
+        className="w-[92%] md:w-[75%] lg:w-[65%] max-w-4xl max-h-[90vh] overflow-y-auto bg-white rounded-2xl shadow-2xl relative p-5 sm:p-8"
         onClick={(e) => e.stopPropagation()}
       >
         <button
@@ -238,16 +244,16 @@ const ProductDetailsCard: React.FC<ProductDetailsCardProps> = ({
                 )}
               </div>
 
-              <div className="flex items-center gap-4 mt-5">
-                <div className="flex items-center bg-gray-200 rounded overflow-hidden">
+              <div className="flex items-center gap-3 mt-5 flex-wrap sm:flex-nowrap">
+                <div className="flex items-center bg-slate-100 rounded-xl overflow-hidden border border-slate-200">
                   <button
                     type="button"
                     onClick={() => setQuantity((prev) => Math.max(1, prev - 1))}
-                    className="px-3 py-1.5 bg-gray-300 text-gray-800 font-bold hover:bg-gray-400 transition-colors cursor-pointer"
+                    className="px-3.5 py-2 text-slate-700 font-bold hover:bg-slate-200 transition-colors cursor-pointer"
                   >
                     -
                   </button>
-                  <span className="px-4 text-sm font-bold text-gray-900">
+                  <span className="px-4 text-xs sm:text-sm font-bold text-slate-900">
                     {quantity}
                   </span>
                   <button
@@ -257,7 +263,7 @@ const ProductDetailsCard: React.FC<ProductDetailsCardProps> = ({
                         data?.stock ? Math.min(data.stock, prev + 1) : prev + 1,
                       )
                     }
-                    className="px-3 py-1.5 bg-gray-300 text-gray-800 font-bold hover:bg-gray-400 transition-colors cursor-pointer"
+                    className="px-3.5 py-2 text-slate-700 font-bold hover:bg-slate-200 transition-colors cursor-pointer"
                   >
                     +
                   </button>
@@ -266,24 +272,24 @@ const ProductDetailsCard: React.FC<ProductDetailsCardProps> = ({
                 <button
                   type="button"
                   onClick={handleAddToCart}
-                  className="bg-[#e74c3c] hover:bg-[#c0392b] text-white p-2.5 rounded-lg flex items-center justify-center transition-colors cursor-pointer shadow-sm"
-                  title="Add to Cart"
+                  className="flex-1 py-2.5 px-5 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs sm:text-sm rounded-xl flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-xs"
                 >
-                  <ShoppingBag size={20} className="text-white" />
+                  <ShoppingBag size={18} />
+                  <span>Add to Cart</span>
                 </button>
 
                 <button
                   type="button"
                   onClick={handleWishlist}
-                  className="cursor-pointer hover:scale-110 transition-transform p-1"
+                  className="p-2.5 rounded-xl border border-slate-200 hover:bg-slate-50 transition-colors cursor-pointer"
                   title="Wishlist"
                 >
                   <Heart
-                    size={26}
+                    size={20}
                     className={`${
                       isWishlist
                         ? 'text-red-500 fill-red-500'
-                        : 'text-gray-400 hover:text-red-500'
+                        : 'text-slate-400 hover:text-red-500'
                     }`}
                   />
                 </button>
@@ -298,6 +304,10 @@ const ProductDetailsCard: React.FC<ProductDetailsCardProps> = ({
           </div>
         </div>
       </div>
+      <LoginRequiredModal
+        isOpen={showLoginModal}
+        onClose={() => setShowLoginModal(false)}
+      />
     </div>
   );
 };

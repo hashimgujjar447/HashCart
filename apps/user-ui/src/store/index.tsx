@@ -11,10 +11,22 @@ type Product = {
   shopId: string;
 };
 
+type UserState = {
+  id: string;
+  name: string;
+  email: string;
+  phone_number?: string | null;
+  avatar?: string | null;
+  role?: string;
+};
+
 type Store = {
   cart: Product[];
   wishlist: Product[];
   wishList: Product[];
+  user: UserState | null;
+  setUser: (user: UserState) => void;
+  clearUser: () => void;
   addToCart: (
     product: Product,
     user?: any,
@@ -238,6 +250,9 @@ export const useStore = create<Store>()(
         cart: [],
         wishlist: [],
         wishList: [],
+        user: null,
+        setUser: (user: UserState) => set({ user }),
+        clearUser: () => set({ user: null }),
         addToCart,
         removeFromCart,
         addToWishlist,

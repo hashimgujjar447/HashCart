@@ -69,7 +69,7 @@ const ForgetPage = () => {
       );
       return response.data;
     },
-    onSuccess: (_, email) => {
+    onSuccess: (_: any, email: any) => {
       setServerError(null);
       setUserEmail(email);
       setStep('otp');

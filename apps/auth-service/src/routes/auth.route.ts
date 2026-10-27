@@ -18,6 +18,14 @@ import {
   resetSellerPassword,
   getAllShops,
   getShopById,
+  addShippingAddress,
+  getShippingAddresses,
+  updateShippingAddress,
+  deleteShippingAddress,
+  updateUserProfile,
+  changeUserPassword,
+  getUserOrders,
+  logoutUser,
 } from '../controller/auth.controller';
 import { isAuthenticated } from '../../../../packages/middleware/isAuthenticated.middleware';
 
@@ -52,5 +60,15 @@ router.post('/seller-reset-password', resetSellerPassword);
 
 router.get("/get-all-shops", getAllShops);
 router.get("/get-shop/:id", getShopById);
+
+router.post('/add-address', isAuthenticated, addShippingAddress);
+router.get('/get-addresses', isAuthenticated, getShippingAddresses);
+router.put('/update-address/:id', isAuthenticated, updateShippingAddress);
+router.delete('/delete-address/:id', isAuthenticated, deleteShippingAddress);
+router.put('/update-profile', isAuthenticated, updateUserProfile);
+router.put('/change-password', isAuthenticated, changeUserPassword);
+router.get('/get-user-orders', isAuthenticated, getUserOrders);
+router.get('/logout', logoutUser);
+router.post('/logout', logoutUser);
 
 export default router;
