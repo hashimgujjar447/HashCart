@@ -17,7 +17,12 @@ const OrdersTab: React.FC<OrdersTabProps> = ({ onStatsLoaded }) => {
     const fetchOrders = async () => {
       setLoading(true);
       try {
-        const res = await axiosInstance.get('/auth/get-user-orders');
+        let res;
+        try {
+          res = await axiosInstance.get('/order/get-user-orders');
+        } catch {
+          res = await axiosInstance.get('/auth/get-user-orders');
+        }
         setOrders(res.data.orders || []);
         if (onStatsLoaded && res.data.stats) {
           onStatsLoaded(res.data.stats);

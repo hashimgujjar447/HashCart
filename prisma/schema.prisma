@@ -58,10 +58,13 @@ model addresses {
 }
 
 enum orderStatus {
+  Pending
   Processing
+  Shipped
+  Delivered
   Completed
   Cancelled
-  Delivered
+  Refunded
 }
 
 model orders {
@@ -69,8 +72,15 @@ model orders {
   userId          String      @db.ObjectId
   user            users       @relation(fields: [userId], references: [id], onDelete: Cascade)
   shopId          String?     @db.ObjectId
+  shop            shops?      @relation(fields: [shopId], references: [id])
   totalAmount     Float
   status          orderStatus @default(Processing)
+  paymentStatus   String      @default("Pending")
+  paymentMethod   String      @default("stripe")
+  paymentIntentId String?
+  couponCode      String?
+  discountAmount  Float       @default(0)
+  deliveryFee     Float       @default(0)
   items           Json[]
   shippingAddress Json?
   createdAt       DateTime    @default(now())
@@ -105,6 +115,7 @@ model shops {
   sellerId      String        @unique @db.ObjectId
   sellers       sellers       @relation(fields: [sellerId], references: [id])
   products      products[]
+  orders        orders[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -221,3 +232,5 @@ model shopAnalytics {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 }
+
+
