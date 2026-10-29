@@ -86,7 +86,12 @@ const ProfileContent = () => {
   useEffect(() => {
     const loadStats = async () => {
       try {
-        const res = await axiosInstance.get('/auth/get-user-orders');
+        let res;
+        try {
+          res = await axiosInstance.get('/order/get-user-orders');
+        } catch {
+          res = await axiosInstance.get('/auth/get-user-orders');
+        }
         if (res.data?.stats) {
           setStats(res.data.stats);
         }

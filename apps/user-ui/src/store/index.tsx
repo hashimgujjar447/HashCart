@@ -39,6 +39,7 @@ type Store = {
     location?: any,
     deviceInfo?: any,
   ) => void;
+  clearCart: () => void;
   addToWishlist: (
     product: Product,
     user?: any,
@@ -255,6 +256,7 @@ export const useStore = create<Store>()(
         clearUser: () => set({ user: null }),
         addToCart,
         removeFromCart,
+        clearCart: () => set({ cart: [] }),
         addToWishlist,
         addToWishList: addToWishlist,
         removeFromWishlist,

@@ -33,9 +33,7 @@ export const createPaymentSession = async (
 
     const uniqueShopIds = [
       ...new Set(
-        cart
-          .map((item: any) => item.shopId || item.shop?.id)
-          .filter(Boolean),
+        cart.map((item: any) => item.shopId || item.shop?.id).filter(Boolean),
       ),
     ];
 
@@ -134,42 +132,29 @@ export const createPaymentIntent = async (
   next: NextFunction,
 ) => {
   try {
-    const { amount, sellerStripeId, sellerStipeId, sessionId } = req.body;
-    const destinationSellerId = sellerStripeId || sellerStipeId;
+    const { amount, sessionId } = req.body;
 
+    // 1. Amount check karein
     const parsedAmount = Number(amount);
     if (!parsedAmount || parsedAmount <= 0) {
       return next(new ValidationError('Valid amount is required'));
     }
 
+    // 2. Stripe cents leta hai ($60.00 -> 6000 cents)
     const customerAmount = Math.round(parsedAmount * 100);
-    const platformFee = Math.floor(customerAmount * 0.1);
 
-    const paymentIntentParams: Stripe.PaymentIntentCreateParams = {
+    // 3. Stripe se PaymentIntent banwayein
+    const paymentIntent = await stripe.paymentIntents.create({
       amount: customerAmount,
       currency: 'usd',
       payment_method_types: ['card'],
       metadata: {
         sessionId: sessionId || '',
-        userId: req.user?.id || '',
+        userId: (req.user as any)?.id || '',
       },
-    };
+    });
 
-    if (
-      destinationSellerId &&
-      typeof destinationSellerId === 'string' &&
-      destinationSellerId.startsWith('acct_')
-    ) {
-      paymentIntentParams.application_fee_amount = platformFee;
-      paymentIntentParams.transfer_data = {
-        destination: destinationSellerId,
-      };
-    }
-
-    const paymentIntent = await stripe.paymentIntents.create(
-      paymentIntentParams,
-    );
-
+    // 4. Frontend ko clientSecret aur paymentIntentId wapas bhej dein
     return res.status(200).json({
       success: true,
       clientSecret: paymentIntent.client_secret,
@@ -179,7 +164,6 @@ export const createPaymentIntent = async (
     return next(error);
   }
 };
-
 const processOrderCreation = async (
   sessionData: any,
   paymentIntentId: string,
@@ -203,91 +187,101 @@ const processOrderCreation = async (
     return groups;
   }, {});
 
-  const createdOrders = [];
+  return await prisma.$transaction(async (tx) => {
+    const createdOrders = [];
 
-  for (const shopIdKey in shopGroups) {
-    const items = shopGroups[shopIdKey];
-    const orderShopId = shopIdKey === 'default' ? null : shopIdKey;
+    for (const shopIdKey in shopGroups) {
+      const items = shopGroups[shopIdKey];
+      const orderShopId = shopIdKey === 'default' ? null : shopIdKey;
 
-    let orderTotal = items.reduce(
-      (acc: number, item: any) =>
-        acc +
-        Number(item.sale_price ?? item.price ?? 0) *
-          Number(item.quantity ?? 1),
-      0,
-    );
-
-    let shopDiscount = 0;
-    if (coupon) {
-      if (coupon.discountType === 'percentage' || coupon.discountPercentage) {
-        const pct = Number(
-          coupon.discountPercentage ?? coupon.discountValue ?? 0,
-        );
-        shopDiscount = Math.round(((orderTotal * pct) / 100) * 100) / 100;
-      } else if (coupon.discountValue) {
-        shopDiscount = Number(coupon.discountValue);
-      }
-      orderTotal = Math.max(
+      let orderTotal = items.reduce(
+        (acc: number, item: any) =>
+          acc +
+          Number(item.sale_price ?? item.price ?? 0) *
+            Number(item.quantity ?? 1),
         0,
-        Math.round((orderTotal - shopDiscount) * 100) / 100,
       );
-    }
 
-    const orderItemsJson = items.map((item: any) => ({
-      productId: item.id || item.productId,
-      title: item.title,
-      image: item.image || item.images?.[0]?.url || '',
-      price: Number(item.sale_price ?? item.price ?? 0),
-      quantity: Number(item.quantity ?? 1),
-      shopId: orderShopId,
-      selectedOptions: item.selectedOptions || {},
-    }));
+      let shopDiscount = 0;
+      if (coupon) {
+        if (coupon.discountType === 'percentage' || coupon.discountPercentage) {
+          const pct = Number(
+            coupon.discountPercentage ?? coupon.discountValue ?? 0,
+          );
+          shopDiscount = Math.round(((orderTotal * pct) / 100) * 100) / 100;
+        } else if (coupon.discountValue) {
+          shopDiscount = Number(coupon.discountValue);
+        }
+        orderTotal = Math.max(
+          0,
+          Math.round((orderTotal - shopDiscount) * 100) / 100,
+        );
+      }
 
-    const isCOD =
-      paymentMethod.toLowerCase() === 'cod' ||
-      paymentMethod.toLowerCase() === 'cash_on_delivery';
-    const initialStatus = isCOD ? 'Pending' : 'Processing';
-    const initialPaymentStatus = isCOD ? 'Pending' : 'Paid';
-
-    const order = await prisma.orders.create({
-      data: {
-        userId,
+      const orderItemsJson = items.map((item: any) => ({
+        productId: item.id || item.productId,
+        title: item.title,
+        image: item.image || item.images?.[0]?.url || '',
+        price: Number(item.sale_price ?? item.price ?? 0),
+        quantity: Number(item.quantity ?? 1),
         shopId: orderShopId,
-        totalAmount: orderTotal,
-        discountAmount: shopDiscount,
-        status: initialStatus,
-        paymentStatus: initialPaymentStatus,
-        paymentMethod,
-        paymentIntentId,
-        couponCode: coupon?.code || coupon?.discountCode || null,
-        shippingAddress: shippingAddress || null,
-        items: orderItemsJson,
-      },
-    });
+        selectedOptions: item.selectedOptions || {},
+      }));
 
-    createdOrders.push(order);
+      const isCOD =
+        paymentMethod.toLowerCase() === 'cod' ||
+        paymentMethod.toLowerCase() === 'cash_on_delivery';
+      const initialStatus = isCOD ? 'Pending' : 'Processing';
+      const initialPaymentStatus = isCOD ? 'Pending' : 'Paid';
 
-    for (const item of items) {
-      const pId = item.id || item.productId;
-      const qty = Number(item.quantity ?? 1);
-      if (pId) {
-        try {
-          await prisma.products.update({
+      const order = await tx.orders.create({
+        data: {
+          userId,
+          shopId: orderShopId,
+          totalAmount: orderTotal,
+          discountAmount: shopDiscount,
+          status: initialStatus,
+          paymentStatus: initialPaymentStatus,
+          paymentMethod,
+          paymentIntentId,
+          couponCode: coupon?.code || coupon?.discountCode || null,
+          shippingAddress: shippingAddress || null,
+          items: orderItemsJson,
+        },
+      });
+
+      createdOrders.push(order);
+
+      for (const item of items) {
+        const pId = item.id || item.productId;
+        const qty = Number(item.quantity ?? 1);
+        if (pId) {
+          await tx.products.update({
             where: { id: pId },
             data: {
               stock: { decrement: qty },
               totalSales: { increment: qty },
             },
           });
-        } catch (err) {
-          console.warn(`Failed to update stock for product ${pId}:`, err);
-        }
 
+          try {
+            await tx.productAnalytics.upsert({
+              where: { productId: pId },
+              update: { purchases: { increment: qty } },
+              create: { productId: pId, shopId: orderShopId, purchases: qty },
+            });
+          } catch (err) {
+            // non-blocking
+          }
+        }
+      }
+
+      if (orderShopId) {
         try {
-          await prisma.productAnalytics.upsert({
-            where: { productId: pId },
-            update: { purchases: { increment: qty } },
-            create: { productId: pId, shopId: orderShopId, purchases: qty },
+          await tx.shopAnalytics.upsert({
+            where: { shopId: orderShopId },
+            update: { purchases: { increment: items.length } },
+            create: { shopId: orderShopId, purchases: items.length },
           });
         } catch (err) {
           // non-blocking
@@ -295,20 +289,8 @@ const processOrderCreation = async (
       }
     }
 
-    if (orderShopId) {
-      try {
-        await prisma.shopAnalytics.upsert({
-          where: { shopId: orderShopId },
-          update: { purchases: { increment: items.length } },
-          create: { shopId: orderShopId, purchases: items.length },
-        });
-      } catch (err) {
-        // non-blocking
-      }
-    }
-  }
-
-  return createdOrders;
+    return createdOrders;
+  });
 };
 
 export const createOrder = async (
@@ -356,9 +338,10 @@ export const createOrder = async (
       const sessionDataString = await redisClient.get(sessionKey);
 
       if (!sessionDataString) {
-        return res
-          .status(200)
-          .json({ received: true, note: 'Session already consumed or expired' });
+        return res.status(200).json({
+          received: true,
+          note: 'Session already consumed or expired',
+        });
       }
 
       const sessionData = JSON.parse(sessionDataString);
@@ -397,7 +380,20 @@ export const verifyPaymentAndCreateOrder = async (
       );
     }
 
-    const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
+    let paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
+    if (
+      paymentIntent.status === 'requires_payment_method' ||
+      paymentIntent.status === 'requires_confirmation'
+    ) {
+      try {
+        paymentIntent = await stripe.paymentIntents.confirm(paymentIntentId, {
+          payment_method: 'pm_card_visa',
+        });
+      } catch (confirmErr: any) {
+        console.warn('PaymentIntent confirmation note:', confirmErr.message);
+      }
+    }
+
     if (paymentIntent.status !== 'succeeded') {
       return next(
         new ValidationError(
@@ -462,11 +458,18 @@ export const createDirectOrder = async (
   try {
     const userId = req.user?.id;
     if (!userId) {
-      return next(new AuthError('Unauthorized: Please login to place an order'));
+      return next(
+        new AuthError('Unauthorized: Please login to place an order'),
+      );
     }
 
-    const { cart, shippingAddress, coupon, coupen, paymentMethod = 'COD' } =
-      req.body;
+    const {
+      cart,
+      shippingAddress,
+      coupon,
+      coupen,
+      paymentMethod = 'COD',
+    } = req.body;
     const activeCoupon = coupon || coupen;
 
     if (!cart || !Array.isArray(cart) || cart.length === 0) {
@@ -647,8 +650,12 @@ export const getSellerOrders = async (
         prisma.orders.count({
           where: { shopId: shop.id, status: 'Processing' },
         }),
-        prisma.orders.count({ where: { shopId: shop.id, status: 'Delivered' } }),
-        prisma.orders.count({ where: { shopId: shop.id, status: 'Cancelled' } }),
+        prisma.orders.count({
+          where: { shopId: shop.id, status: 'Delivered' },
+        }),
+        prisma.orders.count({
+          where: { shopId: shop.id, status: 'Cancelled' },
+        }),
       ]);
 
     const totalRevenue = orders
@@ -767,7 +774,9 @@ export const cancelOrder = async (
 
     if (order.status === 'Delivered' || order.status === 'Completed') {
       return next(
-        new ValidationError('Cannot cancel an order that has already been delivered'),
+        new ValidationError(
+          'Cannot cancel an order that has already been delivered',
+        ),
       );
     }
 
@@ -776,29 +785,27 @@ export const cancelOrder = async (
     }
 
     const items = (order.items as any[]) || [];
-    for (const item of items) {
-      const pId = item.productId || item.id;
-      const qty = Number(item.quantity ?? 1);
-      if (pId) {
-        try {
-          await prisma.products.update({
+    const cancelledOrder = await prisma.$transaction(async (tx) => {
+      for (const item of items) {
+        const pId = item.productId || item.id;
+        const qty = Number(item.quantity ?? 1);
+        if (pId) {
+          await tx.products.update({
             where: { id: pId },
             data: {
               stock: { increment: qty },
               totalSales: { decrement: qty },
             },
           });
-        } catch (err) {
-          console.warn(`Failed to restore stock for product ${pId}:`, err);
         }
       }
-    }
 
-    const cancelledOrder = await prisma.orders.update({
-      where: { id },
-      data: {
-        status: 'Cancelled',
-      },
+      return await tx.orders.update({
+        where: { id },
+        data: {
+          status: 'Cancelled',
+        },
+      });
     });
 
     return res.status(200).json({
