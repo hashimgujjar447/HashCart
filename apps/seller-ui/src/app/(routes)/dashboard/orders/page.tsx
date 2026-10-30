@@ -46,6 +46,17 @@ interface SellerOrder {
   };
 }
 
+// Strict forward order lifecycle transitions
+export const ALLOWED_STATUS_TRANSITIONS: Record<string, string[]> = {
+  Pending: ['Processing', 'Cancelled'],
+  Processing: ['Shipped', 'Cancelled'],
+  Shipped: ['Delivered', 'Cancelled'],
+  Delivered: [],
+  Completed: [],
+  Cancelled: [],
+  Refunded: [],
+};
+
 const fetchSellerOrders = async () => {
   const res = await axiosInstance.get('/order/get-seller-orders', {
     withCredentials: true,
@@ -57,6 +68,10 @@ export default function SellerOrdersPage() {
   const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
+  const [feedback, setFeedback] = useState<{
+    type: 'success' | 'error';
+    text: string;
+  } | null>(null);
 
   const { data, isLoading, refetch, isRefetching } = useQuery({
     queryKey: ['seller-orders'],
@@ -73,11 +88,24 @@ export default function SellerOrdersPage() {
       );
       return res.data;
     },
-    onSuccess: () => {
+    onSuccess: (resData) => {
+      setFeedback({
+        type: 'success',
+        text: resData.message || 'Order status updated successfully',
+      });
+      setTimeout(() => setFeedback(null), 4000);
       queryClient.invalidateQueries({ queryKey: ['seller-orders'] });
       queryClient.invalidateQueries({
         queryKey: ['seller-dashboard-analytics'],
       });
+    },
+    onError: (err: any) => {
+      const msg =
+        err?.response?.data?.message ||
+        err?.message ||
+        'Failed to update order status';
+      setFeedback({ type: 'error', text: msg });
+      setTimeout(() => setFeedback(null), 5000);
     },
   });
 
@@ -124,6 +152,13 @@ export default function SellerOrdersPage() {
             <span>Processing</span>
           </span>
         );
+      case 'Pending':
+        return (
+          <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-purple-500/10 border border-purple-500/20 text-purple-400 flex items-center gap-1.5 w-fit">
+            <Clock className="w-3.5 h-3.5" />
+            <span>Pending</span>
+          </span>
+        );
       case 'Cancelled':
       case 'Refunded':
         return (
@@ -140,6 +175,7 @@ export default function SellerOrdersPage() {
         );
     }
   };
+
 
   return (
     <div className="w-full max-w-[1600px] mx-auto space-y-6 pb-12">
@@ -166,16 +202,51 @@ export default function SellerOrdersPage() {
         </button>
       </div>
 
+      {/* Action Notification Toast/Banner */}
+      {feedback && (
+        <div
+          className={`flex items-center justify-between px-4 py-2.5 rounded-xl border text-xs font-medium animate-in fade-in slide-in-from-top-2 duration-200 ${
+            feedback.type === 'success'
+              ? 'bg-emerald-950/60 border-emerald-600/70 text-emerald-200'
+              : 'bg-rose-950/60 border-rose-600/70 text-rose-200'
+          }`}
+        >
+          <div className="flex items-center gap-2">
+            {feedback.type === 'success' ? (
+              <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+            ) : (
+              <XCircle className="w-4 h-4 text-rose-400 shrink-0" />
+            )}
+            <span>{feedback.text}</span>
+          </div>
+          <button
+            onClick={() => setFeedback(null)}
+            className="text-slate-400 hover:text-white ml-2"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
       {/* Quick Status Filters */}
       <div className="flex flex-wrap items-center gap-2">
         {[
           { label: 'All Orders', value: 'ALL', count: stats.totalOrders },
           {
+            label: 'Pending',
+            value: 'Pending',
+            count: rawOrders.filter((o) => o.status === 'Pending').length,
+          },
+          {
             label: 'Processing',
             value: 'Processing',
             count: stats.processingOrders,
           },
-          { label: 'Shipped', value: 'Shipped', count: null },
+          {
+            label: 'Shipped',
+            value: 'Shipped',
+            count: rawOrders.filter((o) => o.status === 'Shipped').length,
+          },
           {
             label: 'Delivered',
             value: 'Delivered',
@@ -197,6 +268,7 @@ export default function SellerOrdersPage() {
             }`}
           >
             <span>{f.label}</span>
+
             {f.count !== null && (
               <span
                 className={`px-1.5 py-0.2 rounded-full text-[10px] ${
@@ -290,26 +362,62 @@ export default function SellerOrdersPage() {
                         {getStatusBadge(order.status)}
                       </td>
                       <td className="py-3.5 px-4 text-right">
-                        <select
-                          value={order.status}
-                          disabled={
-                            updateStatusMutation.isPending ||
-                            order.status === 'Cancelled'
+                        {(() => {
+                          const allowedNext =
+                            ALLOWED_STATUS_TRANSITIONS[order.status] || [];
+                          const isTerminal = allowedNext.length === 0;
+
+                          if (isTerminal) {
+                            return (
+                              <span className="text-xs text-slate-500 italic px-2 py-1 select-none">
+                                {order.status === 'Cancelled'
+                                  ? 'Cancelled'
+                                  : 'Completed'}
+                              </span>
+                            );
                           }
-                          onChange={(e) =>
-                            updateStatusMutation.mutate({
-                              id: order.id,
-                              status: e.target.value,
-                            })
-                          }
-                          className="bg-slate-900 border border-slate-700 text-slate-200 text-xs rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-blue-500 cursor-pointer disabled:opacity-50"
-                        >
-                          <option value="Processing">Processing</option>
-                          <option value="Shipped">Shipped</option>
-                          <option value="Delivered">Delivered</option>
-                          <option value="Cancelled">Cancelled</option>
-                        </select>
+
+                          return (
+                            <select
+                              value={order.status}
+                              disabled={updateStatusMutation.isPending}
+                              onChange={(e) => {
+                                const newStatus = e.target.value;
+                                if (newStatus === order.status) return;
+
+                                if (
+                                  newStatus === 'Cancelled' &&
+                                  !window.confirm(
+                                    `Are you sure you want to cancel order #${order.id
+                                      .slice(-6)
+                                      .toUpperCase()}? This will restore product stock.`,
+                                  )
+                                ) {
+                                  return;
+                                }
+
+                                updateStatusMutation.mutate({
+                                  id: order.id,
+                                  status: newStatus,
+                                });
+                              }}
+                              className="bg-slate-900 border border-slate-700 hover:border-slate-600 text-slate-200 text-xs rounded-lg px-2.5 py-1.5 focus:outline-none focus:border-blue-500 cursor-pointer disabled:opacity-50 transition-colors"
+                            >
+                              <option value={order.status} disabled>
+                                {order.status} (Current)
+                              </option>
+                              {allowedNext.map((nextStatus) => (
+                                <option key={nextStatus} value={nextStatus}>
+                                  {nextStatus === 'Cancelled'
+                                    ? '✕ Cancel Order'
+                                    : `→ Move to ${nextStatus}`}
+                                </option>
+                              ))}
+                            </select>
+                          );
+                        })()}
                       </td>
+
                     </tr>
                   );
                 })

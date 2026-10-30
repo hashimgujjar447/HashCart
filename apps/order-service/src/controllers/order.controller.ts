@@ -724,13 +724,76 @@ export const updateOrderStatus = async (
       );
     }
 
-    const updatedOrder = await prisma.orders.update({
-      where: { id },
-      data: {
-        status: status as any,
-        ...(status === 'Delivered' ? { paymentStatus: 'Paid' } : {}),
-      },
-    });
+    const currentStatus = order.status as string;
+
+    if (currentStatus === status) {
+      return res.status(200).json({
+        success: true,
+        message: `Order status is already ${status}`,
+        order,
+      });
+    }
+
+    // Strict order lifecycle transitions:
+    // Pending -> Processing -> Shipped -> Delivered
+    // At each active step, an order can also be Cancelled.
+    // Backward transitions (e.g. Shipped -> Processing/Pending, Processing -> Pending) are disallowed.
+    const allowedTransitions: Record<string, string[]> = {
+      Pending: ['Processing', 'Cancelled'],
+      Processing: ['Shipped', 'Cancelled'],
+      Shipped: ['Delivered', 'Cancelled'],
+      Delivered: [],
+      Completed: [],
+      Cancelled: [],
+      Refunded: [],
+    };
+
+    const nextAllowed = allowedTransitions[currentStatus] || [];
+    if (!nextAllowed.includes(status)) {
+      return next(
+        new ValidationError(
+          `Invalid status transition: Order in '${currentStatus}' cannot be changed to '${status}'. Allowed next statuses: ${
+            nextAllowed.length > 0
+              ? nextAllowed.join(', ')
+              : 'None (Order is in terminal state)'
+          }.`,
+        ),
+      );
+    }
+
+    let updatedOrder: any;
+    if (status === 'Cancelled') {
+      const items = (order.items as any[]) || [];
+      updatedOrder = await prisma.$transaction(async (tx) => {
+        for (const item of items) {
+          const pId = item.productId || item.id;
+          const qty = Number(item.quantity ?? 1);
+          if (pId) {
+            await tx.products.update({
+              where: { id: pId },
+              data: {
+                stock: { increment: qty },
+                totalSales: { decrement: qty },
+              },
+            });
+          }
+        }
+        return await tx.orders.update({
+          where: { id },
+          data: {
+            status: 'Cancelled',
+          },
+        });
+      });
+    } else {
+      updatedOrder = await prisma.orders.update({
+        where: { id },
+        data: {
+          status: status as any,
+          ...(status === 'Delivered' ? { paymentStatus: 'Paid' } : {}),
+        },
+      });
+    }
 
     return res.status(200).json({
       success: true,
@@ -741,6 +804,7 @@ export const updateOrderStatus = async (
     return next(error);
   }
 };
+
 
 export const cancelOrder = async (
   req: Request,
