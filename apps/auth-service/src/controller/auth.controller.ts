@@ -107,7 +107,10 @@ export const loginUser = async (
       return next(new ValidationError('Email and password are required'));
     }
 
-    const user = await prisma.users.findUnique({ where: { email } });
+    const user = await prisma.users.findUnique({
+      where: { email },
+      include: { avatar: true },
+    });
     if (!user) {
       return next(new ValidationError('Invalid email or password'));
     }
@@ -130,10 +133,10 @@ export const loginUser = async (
     );
 
     // Clear previous cookies first
-    res.clearCookie('sellerAccessToken');
-    res.clearCookie('sellerRefreshToken');
-    res.clearCookie('accessToken');
-    res.clearCookie('refreshToken');
+    res.clearCookie('sellerAccessToken', { path: '/' });
+    res.clearCookie('sellerRefreshToken', { path: '/' });
+    res.clearCookie('accessToken', { path: '/' });
+    res.clearCookie('refreshToken', { path: '/' });
 
     // Set new user cookies
     setCookie(res, 'accessToken', accessToken);
@@ -144,6 +147,9 @@ export const loginUser = async (
         id: user.id,
         name: user.name,
         email: user.email,
+        phone_number: user.phone_number,
+        avatar: user.avatar,
+        role: 'user',
       },
     });
   } catch (error) {
@@ -302,7 +308,15 @@ export const getUser = async (
 ) => {
   try {
     const user = req.user;
-    res.status(200).json({
+    if (!user || req.role !== 'user') {
+      return res.status(401).json({
+        success: false,
+        message: 'Unauthorized: No active user session',
+        user: null,
+      });
+    }
+    return res.status(200).json({
+      success: true,
       message: 'User fetched successfully',
       user,
     });
@@ -585,8 +599,15 @@ export const getSeller = async (
 ) => {
   try {
     const seller = req.seller;
-    console.log(seller);
-    res.status(200).json({
+    if (!seller || req.role !== 'seller') {
+      return res.status(401).json({
+        success: false,
+        message: 'Unauthorized: No active seller session',
+        seller: null,
+      });
+    }
+    return res.status(200).json({
+      success: true,
       message: 'Seller fetched successfully',
       seller,
     });
@@ -785,7 +806,7 @@ export const getShopById = async (
   next: NextFunction,
 ) => {
   try {
-    const { id } = req.params;
+    const id = req.params.id as string;
     if (!id) {
       return next(new ValidationError('Shop ID is required'));
     }
@@ -937,7 +958,7 @@ export const updateShippingAddress = async (
 ) => {
   try {
     const userId = req.user?.id;
-    const { id } = req.params;
+    const id = req.params.id as string;
 
     if (!userId) {
       return next(new ValidationError('User not authenticated'));
@@ -990,7 +1011,7 @@ export const deleteShippingAddress = async (
 ) => {
   try {
     const userId = req.user?.id;
-    const { id } = req.params;
+    const id = req.params.id as string;
 
     if (!userId) {
       return next(new ValidationError('User not authenticated'));

@@ -13,7 +13,13 @@ const handleLogout = () => {
   // Clear Zustand user state on definitive auth failure
   useStore.getState().clearUser();
   if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
-    window.location.href = '/login';
+    const pathname = window.location.pathname;
+    const isProtected = ['/profile', '/checkout'].some((p) =>
+      pathname.startsWith(p),
+    );
+    if (isProtected) {
+      window.location.href = `/login?redirect=${encodeURIComponent(pathname)}`;
+    }
   }
 };
 
@@ -42,17 +48,9 @@ axiosInstance.interceptors.response.use(
     const originalRequest = error.config;
     const status = error.response?.status;
 
-    console.log(
-      `[Axios Response Interceptor] Error received: status ${status}`,
-      error.config?.url,
-    );
-
-    // Don't try to refresh for auth-checking or refresh endpoints — let them fail silently
+    // Never try to refresh if the failed request was already /auth/refresh-token
     const url = originalRequest?.url || '';
-    const isAuthCheckEndpoint =
-      url.includes('/auth/logged-in-user') ||
-      url.includes('/auth/refresh-token');
-    if (isAuthCheckEndpoint) {
+    if (url.includes('/auth/refresh-token')) {
       return Promise.reject(error);
     }
 

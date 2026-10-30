@@ -4,7 +4,7 @@ import React, { useState, Suspense } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useForm } from 'react-hook-form';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import axiosInstance from '@/utils/axiosInstance';
 import { useStore } from '@/store';
 
@@ -21,6 +21,7 @@ const LoginForm = () => {
   const router = useRouter();
   const searchParams = useSearchParams();
   const redirectUrl = searchParams.get('redirect');
+  const queryClient = useQueryClient();
 
   const loginMutation = useMutation({
     mutationFn: async (data: FormData) => {
@@ -31,9 +32,11 @@ const LoginForm = () => {
       console.log('User logged in successfully:', data);
       setServerError(null);
 
-      // Immediately save user into Zustand store
+      // Immediately save user into Zustand store & TanStack Query cache
       if (data?.user) {
         useStore.getState().setUser(data.user);
+        queryClient.setQueryData(['user'], data.user);
+        queryClient.invalidateQueries({ queryKey: ['user'] });
       }
 
       // Check if user has added a shipping address

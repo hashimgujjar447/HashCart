@@ -4,10 +4,15 @@ import axiosInstance from '@/utils/axiosInstance';
 import { useStore } from '@/store';
 
 const fetchUser = async () => {
-  const response = await axiosInstance.get('/auth/logged-in-user', {
-    withCredentials: true,
-  });
-  return response.data.user;
+  try {
+    const response = await axiosInstance.get('/auth/logged-in-user', {
+      withCredentials: true,
+    });
+    return response.data?.user ?? null;
+  } catch (error: any) {
+    // Return null on 401/guest so queryFn never returns undefined
+    return null;
+  }
 };
 
 export const useUser = () => {
@@ -30,18 +35,30 @@ export const useUser = () => {
   });
 
   useEffect(() => {
-    if (user) {
-      setUser(user);
+    if (!isLoading) {
+      if (user) {
+        setUser(user);
+      } else if (user === null && !cachedUser) {
+        clearUser();
+      }
     }
-  }, [user, setUser]);
+  }, [user, isLoading, cachedUser, setUser, clearUser]);
 
-  useEffect(() => {
-    if (isError) {
-      clearUser();
-    }
-  }, [isError, clearUser]);
+  // Active user: prefer live user if present, fallback to cachedUser while loading
+  const activeUser =
+    user !== undefined && user !== null
+      ? user
+      : isLoading
+        ? cachedUser
+        : user;
 
-  return { user, cachedUser, isLoading, isError, refetch };
+  return {
+    user: activeUser,
+    cachedUser,
+    isLoading,
+    isError,
+    refetch,
+  };
 };
 
 export default useUser;

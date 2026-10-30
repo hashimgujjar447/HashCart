@@ -8,10 +8,19 @@ export const isAuthenticated = async (
   next: NextFunction,
 ) => {
   try {
-    const token =
-      req.cookies['accessToken'] ||
-      req.cookies['sellerAccessToken'] ||
-      req?.headers?.authorization?.split(' ')[1];
+    const isSellerTarget =
+      req.originalUrl?.includes('seller') ||
+      req.path?.includes('seller') ||
+      req.headers.referer?.includes('3001') ||
+      req.headers.origin?.includes('3001');
+
+    const token = isSellerTarget
+      ? req.cookies['sellerAccessToken'] ||
+        req?.headers?.authorization?.split(' ')[1] ||
+        req.cookies['accessToken']
+      : req.cookies['accessToken'] ||
+        req?.headers?.authorization?.split(' ')[1] ||
+        req.cookies['sellerAccessToken'];
 
     if (!token) {
       return res

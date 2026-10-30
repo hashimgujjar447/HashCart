@@ -204,6 +204,34 @@ npx nx serve user-ui
 npx nx serve seller-ui
 ```
 
+### 5. Order Fulfillment & Lifecycle State Machine
+Orders follow a strict forward lifecycle state machine:
+- **`Pending`**: Order created, awaiting confirmation.
+- **`Processing`**: Order confirmed and in preparation. *(Cannot revert back to Pending)*.
+- **`Shipped`**: Order dispatched to logistics. *(Cannot revert back to Processing or Pending)*.
+- **`Delivered`**: Order fulfilled successfully (Terminal state, payment marked Paid).
+- **`Cancelled`**: Order cancelled. Automatically triggers atomic inventory stock restoration transaction.
+
+---
+
+## 📊 Project Completion Status
+
+| Milestone / Component | Status | Details |
+|---|:---:|---|
+| **API Gateway & Routing** | ✅ Completed | Redis caching, rate limiting, CORS, reverse proxy |
+| **Auth Service (User & Seller)** | ✅ Completed | JWT, refresh token cookies, OTP mail verification, Stripe Connect |
+| **Catalog & Products Service** | ✅ Completed | CRUD, ImageKit upload, AI enhancement, Quill editor, categories |
+| **Orders & Checkout Service** | ✅ Completed | COD, Stripe Connect payment intent, multi-shop order splitting |
+| **Order Lifecycle State Machine** | ✅ Completed | Forward-only status validation & atomic inventory recovery |
+| **Analytics & Kafka Service** | ✅ Completed | Kafka event stream, user visits, device and country analytics |
+| **Seller Dashboard & Analytics** | ✅ Completed | Recharts spline curve, device donut, React Simple Maps world map |
+| **Seller Orders Management** | ✅ Completed | Live search, status filters, lifecycle status dropdown |
+| **Customer Storefront (`user-ui`)**| ✅ Completed | Home, faceted search, product details, cart, checkout, profile |
+| **Product Reviews Submission UI** | ⏳ Remaining | Customer review modal on product page & delivered orders |
+| **Order Tracking Stepper for Buyers**| ⏳ Remaining | Visual progress bar on buyer profile order card |
+| **PDF Invoices / Email Receipts** | ⏳ Remaining | Downloadable invoice and fulfillment emails to buyers |
+| **Super Admin Platform Portal** | ⏳ Remaining | Platform owner panel for approving sellers and global stats |
+
 ---
 
 ## 🛠️ Testing the Checkout Flow
@@ -216,3 +244,5 @@ npx nx serve seller-ui
    - **Cash on Delivery (COD)**: Click **"Confirm Order"** for instant order creation.
    - **Pay Online**: Click **"Pay Online"**, confirm the test card popup, and the system executes `createPaymentSession` ➔ `createPaymentIntent` ➔ `verifyPaymentAndCreateOrder` with atomic rollback guards.
 6. Check your orders in `http://localhost:3000/profile` under the **Orders** tab!
+7. Switch to **Seller Portal** (`http://localhost:3001/dashboard/orders`) to fulfill the order through the forward lifecycle (`Pending` ➔ `Processing` ➔ `Shipped` ➔ `Delivered`).
+
