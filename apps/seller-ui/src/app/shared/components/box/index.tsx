@@ -1,15 +1,28 @@
 'use client';
 
-import styled from 'styled-components';
+import React from 'react';
 
-interface BoxProps {
+interface BoxProps extends React.HTMLAttributes<HTMLDivElement> {
   css?: React.CSSProperties;
+  children?: React.ReactNode;
 }
 
-const Box = styled.div.attrs<BoxProps>(({ css }) => ({
-  style: css,
-}))<BoxProps>`
-  box-sizing: border-box;
-`;
+const Box: React.FC<BoxProps> = ({
+  css,
+  style,
+  children,
+  className = '',
+  ...props
+}) => {
+  return (
+    <div
+      style={{ boxSizing: 'border-box', ...css, ...style }}
+      className={className}
+      {...props}
+    >
+      {children}
+    </div>
+  );
+};
 
 export default Box;

@@ -65,6 +65,7 @@
     }
   ],
   "analytics": false,
+  "cacheDirectory": "D:\\.nx-cache",
   "targetDefaults": {
     "@nx/esbuild:esbuild": {
       "cache": true,

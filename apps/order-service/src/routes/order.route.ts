@@ -8,6 +8,7 @@ import {
   getUserOrders,
   getOrderById,
   getSellerOrders,
+  getSellerDashboardAnalytics,
   updateOrderStatus,
   cancelOrder,
 } from '../controllers/order.controller';
@@ -27,6 +28,12 @@ router.get('/get-order/:id', isAuthenticated, getOrderById);
 router.put('/cancel-order/:id', isAuthenticated, cancelOrder);
 
 router.get('/get-seller-orders', isAuthenticated, isSeller, getSellerOrders);
+router.get(
+  '/get-seller-analytics',
+  isAuthenticated,
+  isSeller,
+  getSellerDashboardAnalytics,
+);
 router.put(
   '/update-order-status/:id',
   isAuthenticated,

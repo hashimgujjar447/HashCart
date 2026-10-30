@@ -149,16 +149,18 @@ const ProductsPage = () => {
   });
 
   const categories = useMemo(() => {
+    const list = Array.isArray(products) ? products : [];
     const unique = Array.from(
-      new Set(products.map((p) => p.category).filter(Boolean)),
+      new Set(list.map((p) => p.category).filter(Boolean)),
     );
     return ['All', ...unique];
   }, [products]);
 
   const filteredProducts = useMemo(() => {
-    return products.filter((product) => {
+    const list = Array.isArray(products) ? products : [];
+    return list.filter((product) => {
       const matchesSearch =
-        product.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        product.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         (product.category &&
           product.category.toLowerCase().includes(searchTerm.toLowerCase())) ||
         (product.brand &&
@@ -528,7 +530,8 @@ const ProductsPage = () => {
           {!isLoading && filteredProducts.length > 0 && (
             <div className="px-5 py-3 border-t border-[#1a2333] bg-[#0c121e] flex items-center justify-between text-xs text-gray-400">
               <span>
-                Showing {filteredProducts.length} of {products.length} product(s)
+                Showing {filteredProducts.length} of {products?.length || 0}{' '}
+                product(s)
               </span>
             </div>
           )}
