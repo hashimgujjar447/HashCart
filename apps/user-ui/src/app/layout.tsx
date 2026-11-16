@@ -1,4 +1,5 @@
 import Header from '@/shared/widgets';
+import Footer from '@/shared/widgets/footer/Footer';
 import './global.css';
 import { Poppins, Roboto } from 'next/font/google';
 import QueryProvider from './providers';
@@ -31,7 +32,8 @@ export default function RootLayout({
       <body className={`${roboto.variable} ${poppins.variable} `}>
         <QueryProvider>
           <Header />
-          {children}
+          <main className="min-h-[calc(100vh-250px)]">{children}</main>
+          <Footer />
         </QueryProvider>
       </body>
     </html>
