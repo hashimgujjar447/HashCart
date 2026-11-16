@@ -19,10 +19,12 @@ import {
   Printer,
   ArrowRight,
   RefreshCw,
+  Star,
 } from 'lucide-react';
 import axiosInstance from '@/utils/axiosInstance';
 import OrderTrackingStepper from './order-tracking-stepper';
 import OrderReceiptModal from './order-receipt-modal';
+import WriteReviewModal from '../review/write-review-modal';
 
 interface OrdersTabProps {
   onStatsLoaded?: (stats: any) => void;
@@ -43,6 +45,12 @@ const OrdersTab: React.FC<OrdersTabProps> = ({ onStatsLoaded }) => {
 
   // Receipt Modal State
   const [receiptOrder, setReceiptOrder] = useState<any | null>(null);
+
+  // Review Modal State
+  const [reviewTarget, setReviewTarget] = useState<{
+    order: any;
+    product?: any;
+  } | null>(null);
 
   // Toast Notification
   const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
@@ -434,10 +442,26 @@ const OrdersTab: React.FC<OrdersTabProps> = ({ onStatsLoaded }) => {
                                 </div>
                               </div>
 
-                              <div className="text-right shrink-0">
+                              <div className="text-right shrink-0 flex flex-col items-end gap-1">
                                 <span className="text-sm font-extrabold text-gray-900 block">
                                   ${(price * qty).toFixed(2)}
                                 </span>
+                                {(order.status === 'Delivered' ||
+                                  order.status === 'Completed') && (
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setReviewTarget({ order, product: item });
+                                    }}
+                                    className="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 px-2 py-0.5 rounded-md transition-colors cursor-pointer"
+                                  >
+                                    <Star
+                                      size={11}
+                                      className="text-amber-500 fill-amber-500"
+                                    />
+                                    <span>Review</span>
+                                  </button>
+                                )}
                               </div>
                             </div>
                           );
@@ -522,6 +546,23 @@ const OrdersTab: React.FC<OrdersTabProps> = ({ onStatsLoaded }) => {
                           <Printer size={14} className="text-blue-600" />
                           <span>View Invoice / Print Receipt</span>
                         </button>
+
+                        {/* Verified Review Button for Delivered Orders */}
+                        {(order.status === 'Delivered' ||
+                          order.status === 'Completed') && (
+                          <button
+                            onClick={() =>
+                              setReviewTarget({ order, product: items[0] })
+                            }
+                            className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-900 font-semibold text-xs rounded-xl shadow-2xs transition-colors cursor-pointer"
+                          >
+                            <Star
+                              size={14}
+                              className="text-amber-500 fill-amber-500"
+                            />
+                            <span>Rate & Review Product</span>
+                          </button>
+                        )}
 
                         {/* Contact Seller link */}
                         {order.shop?.id && (
@@ -638,6 +679,39 @@ const OrdersTab: React.FC<OrdersTabProps> = ({ onStatsLoaded }) => {
           order={receiptOrder}
           isOpen={Boolean(receiptOrder)}
           onClose={() => setReceiptOrder(null)}
+        />
+      )}
+
+      {/* Verified Buyer Review Modal */}
+      {reviewTarget && (
+        <WriteReviewModal
+          isOpen={Boolean(reviewTarget)}
+          onClose={() => setReviewTarget(null)}
+          shopId={
+            reviewTarget.order.shopId || reviewTarget.order.shop?.id || ''
+          }
+          shopName={reviewTarget.order.shop?.name || ''}
+          productId={
+            reviewTarget.product?.id ||
+            reviewTarget.product?._id ||
+            reviewTarget.product?.productId ||
+            ''
+          }
+          productTitle={
+            reviewTarget.product?.title || reviewTarget.product?.name || ''
+          }
+          productImage={
+            reviewTarget.product?.image ||
+            reviewTarget.product?.images?.[0]?.url ||
+            ''
+          }
+          onSuccess={() => {
+            showToast(
+              'success',
+              'Your verified review was submitted successfully!',
+            );
+            fetchOrders();
+          }}
         />
       )}
     </div>

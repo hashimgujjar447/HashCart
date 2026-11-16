@@ -15,6 +15,9 @@ import {
   Truck,
   ChevronRight,
   Check,
+  CheckCircle2,
+  Lock,
+  Edit3,
 } from 'lucide-react';
 import axiosInstance from '@/utils/axiosInstance';
 import { useStore } from '@/store';
@@ -23,6 +26,7 @@ import { useLocationTracking } from '@/hooks/useLocation';
 import { useDeviceTracking } from '@/hooks/useDevice';
 import { sendKafkaEvent } from '@/actions/track-user';
 import ProductCard from '@/shared/cards/product-card';
+import WriteReviewModal from '../review/write-review-modal';
 
 interface ProductImage {
   id?: string;
@@ -107,6 +111,52 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({ product }) => {
   const removeFromWishlist = useStore((state: any) => state.removeFromWishlist);
   const wishlist = useStore((state: any) => state.wishlist) || [];
   const isWishlisted = wishlist.some((item: any) => item.id === product?.id);
+
+  // Reviews & Verified Buyer State
+  const [reviewsList, setReviewsList] = useState<any[]>(
+    product?.shop?.reviews || [],
+  );
+  const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
+  const [reviewFilter, setReviewFilter] = useState<'ALL' | number>('ALL');
+  const [eligibility, setEligibility] = useState<{
+    checked: boolean;
+    eligible: boolean;
+    isLoggedIn: boolean;
+    matchedOrder?: any;
+    existingReview?: any;
+    message?: string;
+  }>({
+    checked: false,
+    eligible: false,
+    isLoggedIn: Boolean(user),
+  });
+
+  const checkBuyerEligibility = async () => {
+    if (!user?.id || !product?.id) {
+      setEligibility({ checked: true, eligible: false, isLoggedIn: false });
+      return;
+    }
+    try {
+      const shopId = product.shopId || product.shop?.id || '';
+      const res = await axiosInstance.get(
+        `/auth/check-review-eligibility?productId=${product.id}&shopId=${shopId}`,
+      );
+      setEligibility({
+        checked: true,
+        eligible: Boolean(res.data?.eligible),
+        isLoggedIn: true,
+        matchedOrder: res.data?.matchedOrder,
+        existingReview: res.data?.existingReview,
+        message: res.data?.message,
+      });
+    } catch (err) {
+      setEligibility({ checked: true, eligible: false, isLoggedIn: true });
+    }
+  };
+
+  useEffect(() => {
+    checkBuyerEligibility();
+  }, [user?.id, product?.id]);
 
   useEffect(() => {
     if (product?.id) {
@@ -639,38 +689,270 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({ product }) => {
                 )}
             </div>
           ) : (
-            <div className="py-12 text-center">
-              {product.shop?.reviews && product.shop.reviews.length > 0 ? (
-                <div className="space-y-4 text-left">
-                  {product.shop.reviews.map((rev: ShopReview) => (
-                    <div
-                      key={rev.id}
-                      className="border-b border-gray-100 pb-4 last:border-b-0"
-                    >
-                      <div className="flex items-center gap-2 mb-1">
-                        <div className="flex items-center text-amber-400">
-                          {[...Array(5)].map((_, i) => (
-                            <Star
-                              key={i}
-                              size={14}
-                              fill={i < rev.rating ? '#facc15' : 'transparent'}
-                              stroke="#facc15"
-                            />
-                          ))}
+            <div className="py-6 space-y-8 text-left">
+              {/* Ratings Summary & Verified Buyer Action Banner */}
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 p-6 rounded-2xl bg-gray-50/80 border border-gray-200/80">
+                {/* 1. Big Score & Star Visualizer */}
+                <div className="flex flex-col items-center justify-center text-center p-4 border-b lg:border-b-0 lg:border-r border-gray-200">
+                  <div className="text-4xl sm:text-5xl font-black text-gray-900 tracking-tight">
+                    {reviewsList.length > 0
+                      ? (
+                          reviewsList.reduce((acc, r) => acc + (r.rating || 0), 0) /
+                          reviewsList.length
+                        ).toFixed(1)
+                      : (product.ratings || 5).toFixed(1)}
+                  </div>
+                  <div className="flex items-center justify-center gap-1 my-2">
+                    {[1, 2, 3, 4, 5].map((star) => {
+                      const avg =
+                        reviewsList.length > 0
+                          ? reviewsList.reduce(
+                              (acc, r) => acc + (r.rating || 0),
+                              0,
+                            ) / reviewsList.length
+                          : product.ratings || 5;
+                      return (
+                        <Star
+                          key={star}
+                          size={18}
+                          className={
+                            star <= Math.round(avg)
+                              ? 'text-amber-400 fill-amber-400'
+                              : 'text-gray-300'
+                          }
+                        />
+                      );
+                    })}
+                  </div>
+                  <p className="text-xs text-gray-500 font-medium">
+                    Based on {reviewsList.length} verified buyer{' '}
+                    {reviewsList.length === 1 ? 'review' : 'reviews'}
+                  </p>
+                </div>
+
+                {/* 2. 5-Star Breakdown Bars */}
+                <div className="flex flex-col justify-center space-y-2 px-2">
+                  {[5, 4, 3, 2, 1].map((num) => {
+                    const count = reviewsList.filter(
+                      (r) => Math.round(r.rating) === num,
+                    ).length;
+                    const pct =
+                      reviewsList.length > 0
+                        ? Math.round((count / reviewsList.length) * 100)
+                        : num === 5
+                        ? 100
+                        : 0;
+                    return (
+                      <div key={num} className="flex items-center gap-2.5 text-xs">
+                        <span className="w-8 font-semibold text-gray-700 flex items-center gap-1">
+                          {num} <Star size={11} className="fill-amber-400 text-amber-400" />
+                        </span>
+                        <div className="flex-1 h-2 rounded-full bg-gray-200 overflow-hidden">
+                          <div
+                            className="h-full bg-amber-400 rounded-full transition-all duration-300"
+                            style={{ width: `${pct}%` }}
+                          />
                         </div>
-                        <span className="text-xs font-bold text-gray-900">
-                          {rev.user?.name || 'Verified Buyer'}
+                        <span className="w-8 text-right text-gray-400 font-mono text-[11px]">
+                          {count}
                         </span>
                       </div>
-                      <p className="text-xs text-gray-700">{rev.reviews}</p>
+                    );
+                  })}
+                </div>
+
+                {/* 3. Verified Buyer Verification & Action Card */}
+                <div className="flex flex-col justify-between p-4 rounded-xl bg-white border border-gray-200 shadow-2xs">
+                  <div>
+                    <div className="flex items-center gap-2 mb-2">
+                      <ShieldCheck className="w-5 h-5 text-emerald-600 shrink-0" />
+                      <h4 className="text-xs sm:text-sm font-bold text-gray-900">
+                        Verified Purchase Guarantee
+                      </h4>
                     </div>
-                  ))}
+                    <p className="text-xs text-gray-500 leading-relaxed mb-4">
+                      {eligibility.eligible
+                        ? 'You are a verified buyer for this product! Share your genuine experience with the community.'
+                        : eligibility.isLoggedIn
+                        ? 'Only verified buyers who have received this product in a delivered order can submit a review.'
+                        : 'Have you purchased this product? Sign in to submit a verified buyer review.'}
+                    </p>
+                  </div>
+
+                  <div>
+                    {eligibility.eligible ? (
+                      <button
+                        type="button"
+                        onClick={() => setIsReviewModalOpen(true)}
+                        className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-md shadow-blue-600/20 transition cursor-pointer"
+                      >
+                        <Edit3 size={14} />
+                        <span>
+                          {eligibility.existingReview
+                            ? 'Update Your Review'
+                            : 'Write a Verified Review'}
+                        </span>
+                      </button>
+                    ) : !eligibility.isLoggedIn ? (
+                      <Link
+                        href="/login"
+                        className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold text-xs transition"
+                      >
+                        <span>Sign In to Review</span>
+                      </Link>
+                    ) : (
+                      <div className="p-2.5 rounded-lg bg-gray-50 border border-gray-200 text-[11px] text-gray-500 flex items-center gap-2">
+                        <Lock size={13} className="text-gray-400 shrink-0" />
+                        <span>Requires a completed delivered order</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Filter Pills */}
+              <div className="flex items-center justify-between flex-wrap gap-3 pb-2 border-b border-gray-200">
+                <h3 className="text-sm font-bold text-gray-900">
+                  Customer Reviews ({reviewsList.length})
+                </h3>
+
+                <div className="flex items-center gap-1.5 overflow-x-auto text-xs">
+                  <button
+                    onClick={() => setReviewFilter('ALL')}
+                    className={`px-3 py-1 rounded-lg font-medium transition cursor-pointer ${
+                      reviewFilter === 'ALL'
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
+                    }`}
+                  >
+                    All ({reviewsList.length})
+                  </button>
+                  {[5, 4, 3, 2, 1].map((stars) => {
+                    const c = reviewsList.filter(
+                      (r) => Math.round(r.rating) === stars,
+                    ).length;
+                    return (
+                      <button
+                        key={stars}
+                        onClick={() => setReviewFilter(stars)}
+                        className={`px-3 py-1 rounded-lg font-medium flex items-center gap-1 transition cursor-pointer ${
+                          reviewFilter === stars
+                            ? 'bg-blue-600 text-white'
+                            : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
+                        }`}
+                      >
+                        <span>{stars}</span>
+                        <Star size={11} className="fill-current" />
+                        <span className="text-[10px] opacity-80">({c})</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Reviews List */}
+              {reviewsList.length === 0 ? (
+                <div className="py-12 text-center bg-gray-50/50 rounded-2xl border border-dashed border-gray-200">
+                  <div className="w-12 h-12 rounded-full bg-amber-50 text-amber-500 flex items-center justify-center mx-auto mb-3">
+                    <Star size={24} />
+                  </div>
+                  <h4 className="text-sm font-bold text-gray-900 mb-1">
+                    No Reviews Yet
+                  </h4>
+                  <p className="text-xs text-gray-500 max-w-sm mx-auto">
+                    Be the first verified buyer to receive and review this product!
+                  </p>
                 </div>
               ) : (
-                <div className="text-gray-400 text-sm font-medium py-6">
-                  No Reviews available yet!
+                <div className="divide-y divide-gray-100 space-y-4">
+                  {reviewsList
+                    .filter((rev) =>
+                      reviewFilter === 'ALL'
+                        ? true
+                        : Math.round(rev.rating) === reviewFilter,
+                    )
+                    .map((rev: ShopReview) => (
+                      <div key={rev.id} className="pt-4 first:pt-0">
+                        <div className="flex items-start justify-between gap-3 mb-2">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-blue-600 to-indigo-600 text-white font-bold text-sm flex items-center justify-center shadow-xs">
+                              {rev.user?.name?.charAt(0).toUpperCase() || 'U'}
+                            </div>
+
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs sm:text-sm font-bold text-gray-900">
+                                  {rev.user?.name || 'Verified Customer'}
+                                </span>
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                  <CheckCircle2 size={11} className="text-emerald-600" />
+                                  <span>Verified Purchase</span>
+                                </span>
+                              </div>
+
+                              <div className="flex items-center gap-2 mt-1">
+                                <div className="flex items-center text-amber-400">
+                                  {[...Array(5)].map((_, i) => (
+                                    <Star
+                                      key={i}
+                                      size={13}
+                                      fill={
+                                        i < rev.rating
+                                          ? '#facc15'
+                                          : 'transparent'
+                                      }
+                                      stroke="#facc15"
+                                    />
+                                  ))}
+                                </div>
+                                <span className="text-[11px] text-gray-400">
+                                  {new Date(
+                                    rev.createdAt,
+                                  ).toLocaleDateString(undefined, {
+                                    month: 'short',
+                                    day: 'numeric',
+                                    year: 'numeric',
+                                  })}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        <p className="text-xs sm:text-sm text-gray-700 leading-relaxed pl-13">
+                          {rev.reviews}
+                        </p>
+                      </div>
+                    ))}
                 </div>
               )}
+
+              {/* Write Review Modal */}
+              <WriteReviewModal
+                isOpen={isReviewModalOpen}
+                onClose={() => setIsReviewModalOpen(false)}
+                shopId={product.shopId || product.shop?.id || ''}
+                shopName={product.shop?.name || ''}
+                productId={product.id}
+                productTitle={product.title}
+                productImage={product.images?.[0]?.url || ''}
+                initialRating={eligibility.existingReview?.rating || 5}
+                initialComment={eligibility.existingReview?.comment || ''}
+                onSuccess={() => {
+                  checkBuyerEligibility();
+                  // Re-fetch reviews for the product
+                  axiosInstance
+                    .get(`/product/get-product/${product.slug || product.id}`)
+                    .then((res) => {
+                      if (res.data?.product?.shop?.reviews) {
+                        setReviewsList(res.data.product.shop.reviews);
+                      }
+                    })
+                    .catch((err) =>
+                      console.error('Failed to reload reviews:', err),
+                    );
+                }}
+              />
             </div>
           )}
         </div>

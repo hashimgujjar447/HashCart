@@ -1325,3 +1325,342 @@ export const updateShopProfile = async (
     return next(error);
   }
 };
+
+// Check if user is eligible to review a product / shop (must be a verified buyer with a Delivered order)
+export const checkReviewEligibility = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) {
+      return res.status(200).json({
+        success: true,
+        eligible: false,
+        isLoggedIn: false,
+        message: 'Please log in to review this product.',
+      });
+    }
+
+    const { productId, shopId } = req.query;
+
+    if (!shopId && !productId) {
+      return next(
+        new ValidationError('Either shopId or productId is required'),
+      );
+    }
+
+    // 1. Fetch user's delivered or completed orders
+    const deliveredOrders = await prisma.orders.findMany({
+      where: {
+        userId,
+        status: { in: ['Delivered', 'Completed'] },
+      },
+      select: {
+        id: true,
+        shopId: true,
+        items: true,
+        createdAt: true,
+        status: true,
+      },
+    });
+
+    let isVerifiedBuyer = false;
+    let matchedOrder: any = null;
+
+    if (productId) {
+      const prodIdStr = String(productId);
+      for (const order of deliveredOrders) {
+        const items = Array.isArray(order.items) ? order.items : [];
+        const found = items.some(
+          (item: any) =>
+            item.id === prodIdStr ||
+            item._id === prodIdStr ||
+            item.productId === prodIdStr,
+        );
+        if (found) {
+          isVerifiedBuyer = true;
+          matchedOrder = order;
+          break;
+        }
+      }
+    } else if (shopId) {
+      const targetShopId = String(shopId);
+      matchedOrder = deliveredOrders.find((o) => o.shopId === targetShopId);
+      if (matchedOrder) {
+        isVerifiedBuyer = true;
+      }
+    }
+
+    // 2. Check if user already submitted a review
+    let existingReview: any = null;
+    if (shopId) {
+      existingReview = await prisma.shopReviews.findFirst({
+        where: {
+          userId,
+          shopId: String(shopId),
+        },
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      isLoggedIn: true,
+      eligible: isVerifiedBuyer,
+      matchedOrder: matchedOrder
+        ? {
+            id: matchedOrder.id,
+            date: matchedOrder.createdAt,
+          }
+        : null,
+      existingReview: existingReview
+        ? {
+            id: existingReview.id,
+            rating: existingReview.rating,
+            comment: existingReview.reviews,
+            updatedAt: existingReview.updatedAt,
+          }
+        : null,
+      message: isVerifiedBuyer
+        ? 'Verified Buyer: You are eligible to review this product.'
+        : 'Only verified buyers who have received this product can write a review.',
+    });
+  } catch (error) {
+    return next(error);
+  }
+};
+
+// Add or update review (with strict verified buyer check)
+export const addReview = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) {
+      return next(new AuthError('User not authenticated'));
+    }
+
+    const { shopId, productId, rating, comment } = req.body;
+
+    if (!shopId) {
+      return next(new ValidationError('Shop ID is required'));
+    }
+
+    const parsedRating = parseFloat(rating);
+    if (isNaN(parsedRating) || parsedRating < 1 || parsedRating > 5) {
+      return next(
+        new ValidationError('Rating must be a number between 1 and 5'),
+      );
+    }
+
+    if (!comment || comment.trim().length < 3) {
+      return next(
+        new ValidationError('Review text must be at least 3 characters'),
+      );
+    }
+
+    // 1. Anti-Fake Review Protection: Verify user actually received a delivered order!
+    const deliveredOrders = await prisma.orders.findMany({
+      where: {
+        userId,
+        status: { in: ['Delivered', 'Completed'] },
+      },
+      select: {
+        id: true,
+        shopId: true,
+        items: true,
+      },
+    });
+
+    let isVerifiedBuyer = false;
+    if (productId) {
+      const prodIdStr = String(productId);
+      for (const order of deliveredOrders) {
+        const items = Array.isArray(order.items) ? order.items : [];
+        const found = items.some(
+          (item: any) =>
+            item.id === prodIdStr ||
+            item._id === prodIdStr ||
+            item.productId === prodIdStr,
+        );
+        if (found) {
+          isVerifiedBuyer = true;
+          break;
+        }
+      }
+    } else {
+      isVerifiedBuyer = deliveredOrders.some((o) => o.shopId === shopId);
+    }
+
+    if (!isVerifiedBuyer) {
+      return res.status(403).json({
+        success: false,
+        message:
+          'Review Rejected: Only verified buyers who have received this product can write a review. No delivered order was found on your account for this item.',
+      });
+    }
+
+    // 2. Upsert Review: if user already reviewed this shop/product, update it
+    const existingReview = await prisma.shopReviews.findFirst({
+      where: {
+        userId,
+        shopId,
+      },
+    });
+
+    let savedReview;
+    if (existingReview) {
+      savedReview = await prisma.shopReviews.update({
+        where: { id: existingReview.id },
+        data: {
+          rating: parsedRating,
+          reviews: comment.trim(),
+        },
+        include: {
+          user: {
+            select: {
+              id: true,
+              name: true,
+              avatar: true,
+            },
+          },
+        },
+      });
+    } else {
+      savedReview = await prisma.shopReviews.create({
+        data: {
+          userId,
+          shopId,
+          rating: parsedRating,
+          reviews: comment.trim(),
+        },
+        include: {
+          user: {
+            select: {
+              id: true,
+              name: true,
+              avatar: true,
+            },
+          },
+        },
+      });
+    }
+
+    // 3. Recalculate average rating for the shop
+    const allShopReviews = await prisma.shopReviews.findMany({
+      where: { shopId },
+      select: { rating: true },
+    });
+
+    const totalRatings = allShopReviews.reduce((sum, r) => sum + r.rating, 0);
+    const avgRating =
+      allShopReviews.length > 0
+        ? Math.round((totalRatings / allShopReviews.length) * 10) / 10
+        : parsedRating;
+
+    await prisma.shops.update({
+      where: { id: shopId },
+      data: { ratings: avgRating },
+    });
+
+    // If productId was provided, also update product rating
+    if (productId) {
+      try {
+        await prisma.products.update({
+          where: { id: productId },
+          data: { ratings: avgRating },
+        });
+      } catch (prodErr) {
+        console.warn('Could not update product rating:', prodErr);
+      }
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: existingReview
+        ? 'Your verified review has been updated successfully!'
+        : 'Thank you! Your verified purchase review has been published.',
+      review: savedReview,
+      averageRating: avgRating,
+      totalReviews: allShopReviews.length,
+    });
+  } catch (error) {
+    return next(error);
+  }
+};
+
+// Toggle follow/unfollow shop
+export const toggleFollowShop = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) {
+      return next(new AuthError('Please log in to follow this store'));
+    }
+
+    const { shopId } = req.body;
+    if (!shopId) {
+      return next(new ValidationError('Shop ID is required'));
+    }
+
+    const shop = await prisma.shops.findUnique({
+      where: { id: shopId },
+      select: { id: true, name: true },
+    });
+
+    if (!shop) {
+      return next(new ValidationError('Shop not found'));
+    }
+
+    const user = await prisma.users.findUnique({
+      where: { id: userId },
+      select: { following: true },
+    });
+
+    const currentFollowing: string[] = user?.following || [];
+    const isCurrentlyFollowing = currentFollowing.includes(shopId);
+
+    let updatedFollowing: string[];
+    let action: 'followed' | 'unfollowed';
+
+    if (isCurrentlyFollowing) {
+      updatedFollowing = currentFollowing.filter((id) => id !== shopId);
+      action = 'unfollowed';
+    } else {
+      updatedFollowing = [...currentFollowing, shopId];
+      action = 'followed';
+    }
+
+    await prisma.users.update({
+      where: { id: userId },
+      data: { following: updatedFollowing },
+    });
+
+    const followersCount = await prisma.users.count({
+      where: {
+        following: {
+          has: shopId,
+        },
+      },
+    });
+
+    return res.status(200).json({
+      success: true,
+      action,
+      isFollowing: !isCurrentlyFollowing,
+      followersCount,
+      message:
+        action === 'followed'
+          ? `You are now following ${shop.name}!`
+          : `You unfollowed ${shop.name}.`,
+    });
+  } catch (error) {
+    return next(error);
+  }
+};

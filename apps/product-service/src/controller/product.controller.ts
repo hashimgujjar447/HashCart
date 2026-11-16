@@ -627,7 +627,20 @@ export const getProductById = async (
         shop: {
           include: {
             avatar: true,
-            reviews: true,
+            reviews: {
+              include: {
+                user: {
+                  select: {
+                    id: true,
+                    name: true,
+                    avatar: true,
+                  },
+                },
+              },
+              orderBy: {
+                createdAt: 'desc',
+              },
+            },
           },
         },
       },
@@ -1222,7 +1235,7 @@ export const getShopById = async (
   next: NextFunction,
 ) => {
   try {
-    const { id } = req.params;
+    const id = req.params.id as string;
     if (!id) {
       return next(new ValidationError('Shop ID is required'));
     }

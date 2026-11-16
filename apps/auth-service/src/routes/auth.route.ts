@@ -27,6 +27,9 @@ import {
   getUserOrders,
   logoutUser,
   updateShopProfile,
+  checkReviewEligibility,
+  addReview,
+  toggleFollowShop,
 } from '../controller/auth.controller';
 import { isAuthenticated } from '../../../../packages/middleware/isAuthenticated.middleware';
 
@@ -70,6 +73,13 @@ router.put('/update-profile', isAuthenticated, updateUserProfile);
 router.put('/update-shop-profile', isAuthenticated, updateShopProfile);
 router.put('/change-password', isAuthenticated, changeUserPassword);
 router.get('/get-user-orders', isAuthenticated, getUserOrders);
+router.get(
+  '/check-review-eligibility',
+  isAuthenticated,
+  checkReviewEligibility,
+);
+router.post('/add-review', isAuthenticated, addReview);
+router.put('/toggle-follow-shop', isAuthenticated, toggleFollowShop);
 router.get('/logout', logoutUser);
 router.post('/logout', logoutUser);
 
