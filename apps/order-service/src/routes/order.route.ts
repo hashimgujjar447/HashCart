@@ -8,6 +8,7 @@ import {
   getUserOrders,
   getOrderById,
   getSellerOrders,
+  getSellerPayments,
   getSellerDashboardAnalytics,
   updateOrderStatus,
   cancelOrder,
@@ -28,6 +29,12 @@ router.get('/get-order/:id', isAuthenticated, getOrderById);
 router.put('/cancel-order/:id', isAuthenticated, cancelOrder);
 
 router.get('/get-seller-orders', isAuthenticated, isSeller, getSellerOrders);
+router.get(
+  '/get-seller-payments',
+  isAuthenticated,
+  isSeller,
+  getSellerPayments,
+);
 router.get(
   '/get-seller-analytics',
   isAuthenticated,

@@ -26,6 +26,7 @@ import {
   changeUserPassword,
   getUserOrders,
   logoutUser,
+  updateShopProfile,
 } from '../controller/auth.controller';
 import { isAuthenticated } from '../../../../packages/middleware/isAuthenticated.middleware';
 
@@ -66,6 +67,7 @@ router.get('/get-addresses', isAuthenticated, getShippingAddresses);
 router.put('/update-address/:id', isAuthenticated, updateShippingAddress);
 router.delete('/delete-address/:id', isAuthenticated, deleteShippingAddress);
 router.put('/update-profile', isAuthenticated, updateUserProfile);
+router.put('/update-shop-profile', isAuthenticated, updateShopProfile);
 router.put('/change-password', isAuthenticated, changeUserPassword);
 router.get('/get-user-orders', isAuthenticated, getUserOrders);
 router.get('/logout', logoutUser);

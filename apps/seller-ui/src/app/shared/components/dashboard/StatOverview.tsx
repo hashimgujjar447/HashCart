@@ -9,6 +9,7 @@ interface StatsOverviewProps {
     totalOrders: number;
     processingOrders: number;
     deliveredOrders: number;
+    activeVisitors?: number;
   };
   isLoading?: boolean;
 }
@@ -20,29 +21,29 @@ export const StatOverview: React.FC<StatsOverviewProps> = ({
   const cards = [
     {
       title: 'Total Revenue',
-      value: stats ? `$${stats.totalRevenue.toLocaleString()}` : '$2,850',
+      value: stats ? `$${stats.totalRevenue.toLocaleString()}` : '$0',
       change: '+18.2% from last month',
       icon: <DollarSign className="w-5 h-5 text-blue-400" />,
       accent: 'border-blue-500/20 bg-blue-500/5',
     },
     {
       title: 'Total Orders',
-      value: stats ? stats.totalOrders.toString() : '6',
-      change: '+12% from last month',
+      value: stats ? stats.totalOrders.toString() : '0',
+      change: 'All lifetime orders',
       icon: <ShoppingCart className="w-5 h-5 text-emerald-400" />,
       accent: 'border-emerald-500/20 bg-emerald-500/5',
     },
     {
       title: 'Delivered',
-      value: stats ? stats.deliveredOrders.toString() : '2',
-      change: '100% fulfillment rate',
+      value: stats ? stats.deliveredOrders.toString() : '0',
+      change: 'Fulfilled orders',
       icon: <TrendingUp className="w-5 h-5 text-amber-400" />,
       accent: 'border-amber-500/20 bg-amber-500/5',
     },
     {
       title: 'Active Store Visitors',
-      value: '2,980',
-      change: '+28.4% online now',
+      value: stats?.activeVisitors !== undefined ? stats.activeVisitors.toLocaleString() : (isLoading ? '...' : '0'),
+      change: 'Live traffic tracking',
       icon: <Users className="w-5 h-5 text-purple-400" />,
       accent: 'border-purple-500/20 bg-purple-500/5',
     },

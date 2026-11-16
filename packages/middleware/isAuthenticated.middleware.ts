@@ -68,7 +68,11 @@ export const isAuthenticated = async (
           stripeId: true,
           createdAt: true,
           updatedAt: true,
-          shop: true,
+          shop: {
+            include: {
+              avatar: true,
+            },
+          },
         },
       });
       req.seller = seller;

@@ -518,10 +518,16 @@ export const createStripeConnectAccountLink = async (
       },
     });
 
+    const origin =
+      (req.headers.origin as string) ||
+      (req.headers.referer
+        ? new URL(req.headers.referer as string).origin
+        : 'http://localhost:3001');
+
     const accountLink = await stripe.accountLinks.create({
       account: account.id,
-      refresh_url: 'http://localhost:3000/success',
-      return_url: 'http://localhost:3000/success',
+      refresh_url: `${origin}/dashboard/payments?stripe_connect=refresh`,
+      return_url: `${origin}/dashboard/payments?stripe_connect=success`,
       type: 'account_onboarding',
     });
 
@@ -1168,9 +1174,152 @@ export const logoutUser = async (
   try {
     res.clearCookie('accessToken');
     res.clearCookie('refreshToken');
+    res.clearCookie('sellerAccessToken');
+    res.clearCookie('sellerRefreshToken');
     return res.status(200).json({
       success: true,
       message: 'Logged out successfully',
+    });
+  } catch (error) {
+    return next(error);
+  }
+};
+
+// Update shop profile
+export const updateShopProfile = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const seller = req.seller;
+    if (!seller || req.role !== 'seller') {
+      return res.status(401).json({
+        success: false,
+        message: 'Unauthorized: Seller session required',
+      });
+    }
+
+    const {
+      name,
+      bio,
+      category,
+      address,
+      opening_hours,
+      website,
+      coverBanner,
+      avatar,
+      sellerName,
+      phone_number,
+    } = req.body;
+
+    if (!name || name.trim() === '') {
+      return next(new ValidationError('Shop name is required'));
+    }
+
+    // 1. Update seller details if sellerName or phone_number is provided
+    const sellerUpdateData: any = {};
+    if (sellerName && sellerName.trim() !== '') {
+      sellerUpdateData.name = sellerName.trim();
+    }
+    if (phone_number !== undefined) {
+      sellerUpdateData.phone_number = phone_number;
+    }
+    if (Object.keys(sellerUpdateData).length > 0) {
+      await prisma.sellers.update({
+        where: { id: seller.id },
+        data: sellerUpdateData,
+      });
+    }
+
+    // 2. Find or create shop for seller
+    let shop = await prisma.shops.findUnique({
+      where: { sellerId: seller.id },
+      include: { avatar: true },
+    });
+
+    const shopPayload: any = {
+      name: name.trim(),
+      bio: bio !== undefined ? bio : shop?.bio,
+      category: category !== undefined ? category : shop?.category || 'General',
+      address: address !== undefined ? address : shop?.address || '',
+      opening_hours:
+        opening_hours !== undefined ? opening_hours : shop?.opening_hours,
+      website: website !== undefined ? website : shop?.website,
+      coverBanner: coverBanner !== undefined ? coverBanner : shop?.coverBanner,
+    };
+
+    if (shop) {
+      shop = await prisma.shops.update({
+        where: { id: shop.id },
+        data: shopPayload,
+        include: { avatar: true },
+      });
+    } else {
+      shop = await prisma.shops.create({
+        data: {
+          ...shopPayload,
+          sellerId: seller.id,
+        },
+        include: { avatar: true },
+      });
+    }
+
+    // 3. Handle avatar image if provided
+    if (avatar && (avatar.url || typeof avatar === 'string')) {
+      const avatarUrl = typeof avatar === 'string' ? avatar : avatar.url;
+      const avatarFileId =
+        (typeof avatar === 'object' && avatar.fileId) ||
+        `shop_avatar_${Date.now()}`;
+
+      const existingImage = await prisma.images.findFirst({
+        where: { shopId: shop.id },
+      });
+
+      if (existingImage) {
+        await prisma.images.update({
+          where: { id: existingImage.id },
+          data: {
+            url: avatarUrl,
+            file_id: avatarFileId,
+          },
+        });
+      } else {
+        await prisma.images.create({
+          data: {
+            url: avatarUrl,
+            file_id: avatarFileId,
+            shopId: shop.id,
+          },
+        });
+      }
+    }
+
+    // 4. Fetch updated seller record with fresh shop and avatar
+    const updatedSeller = await prisma.sellers.findUnique({
+      where: { id: seller.id },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        phone_number: true,
+        country: true,
+        stripeId: true,
+        createdAt: true,
+        updatedAt: true,
+        shop: {
+          include: {
+            avatar: true,
+          },
+        },
+      },
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: 'Shop settings updated successfully',
+      seller: updatedSeller,
+      shop: updatedSeller?.shop,
     });
   } catch (error) {
     return next(error);

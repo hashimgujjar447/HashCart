@@ -678,6 +678,129 @@ export const getSellerOrders = async (
   }
 };
 
+export const getSellerPayments = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    const sellerId = req.seller?.id;
+    if (!sellerId) {
+      return next(new AuthError('Seller not authenticated'));
+    }
+
+    const seller = await prisma.sellers.findUnique({
+      where: { id: sellerId },
+      include: { shop: true },
+    });
+
+    if (!seller || !seller.shop) {
+      return next(new ValidationError('Shop not found for this seller'));
+    }
+
+    const shopId = seller.shop.id;
+
+    const orders = await prisma.orders.findMany({
+      where: { shopId },
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    const COMMISSION_RATE = 0.1;
+    const SELLER_SHARE = 0.9;
+
+    let grossRevenue = 0;
+    let deliveredRevenue = 0;
+    let pendingRevenue = 0;
+    let refundedRevenue = 0;
+
+    const payoutTransactions = orders.map((order) => {
+      const isDeliveredOrCompleted =
+        order.status === 'Delivered' || order.status === 'Completed';
+      const isPendingOrProcessing =
+        order.status === 'Pending' ||
+        order.status === 'Processing' ||
+        order.status === 'Shipped';
+      const isCancelledOrRefunded =
+        order.status === 'Cancelled' || order.status === 'Refunded';
+
+      const amount = order.totalAmount || 0;
+      const commissionFee = Math.round(amount * COMMISSION_RATE * 100) / 100;
+      const netPayout = Math.round(amount * SELLER_SHARE * 100) / 100;
+
+      if (!isCancelledOrRefunded) {
+        grossRevenue += amount;
+        if (isDeliveredOrCompleted) {
+          deliveredRevenue += amount;
+        } else if (isPendingOrProcessing) {
+          pendingRevenue += amount;
+        }
+      } else {
+        refundedRevenue += amount;
+      }
+
+      return {
+        id: order.id,
+        orderId: order.id,
+        createdAt: order.createdAt,
+        customerName: order.user?.name || 'Customer',
+        customerEmail: order.user?.email || '',
+        orderStatus: order.status,
+        paymentStatus: order.paymentStatus || 'Paid',
+        paymentMethod: order.paymentMethod || 'Stripe',
+        grossAmount: amount,
+        commissionFee,
+        netPayout,
+        payoutStatus: isDeliveredOrCompleted
+          ? 'Available'
+          : isPendingOrProcessing
+          ? 'In Escrow'
+          : 'Cancelled',
+      };
+    });
+
+    const netLifetimeEarnings =
+      Math.round(grossRevenue * SELLER_SHARE * 100) / 100;
+    const availableBalance =
+      Math.round(deliveredRevenue * SELLER_SHARE * 100) / 100;
+    const pendingBalance =
+      Math.round(pendingRevenue * SELLER_SHARE * 100) / 100;
+    const totalCommissionPaid =
+      Math.round(grossRevenue * COMMISSION_RATE * 100) / 100;
+
+    return res.status(200).json({
+      success: true,
+      stats: {
+        grossRevenue: Math.round(grossRevenue * 100) / 100,
+        netLifetimeEarnings,
+        availableBalance,
+        pendingBalance,
+        totalCommissionPaid,
+        commissionRate: 10,
+        deliveredOrdersCount: orders.filter(
+          (o) => o.status === 'Delivered' || o.status === 'Completed',
+        ).length,
+        totalOrdersCount: orders.length,
+      },
+      stripe: {
+        isConnected: Boolean(seller.stripeId),
+        stripeId: seller.stripeId || null,
+      },
+      transactions: payoutTransactions,
+    });
+  } catch (error) {
+    return next(error);
+  }
+};
+
 export const updateOrderStatus = async (
   req: Request,
   res: Response,
@@ -901,21 +1024,30 @@ export const getSellerDashboardAnalytics = async (
       return next(new ValidationError('Shop not found for this seller'));
     }
 
-    // Fetch all shop orders
-    const orders = await prisma.orders.findMany({
-      where: { shopId: shop.id },
-      include: {
-        user: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            avatar: true,
+    // Fetch all shop orders and real analytics data in parallel
+    const [orders, shopAnalytics, userAnalyticsList] = await Promise.all([
+      prisma.orders.findMany({
+        where: { shopId: shop.id },
+        include: {
+          user: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              avatar: true,
+            },
           },
         },
-      },
-      orderBy: { createdAt: 'desc' },
-    });
+        orderBy: { createdAt: 'desc' },
+      }),
+      prisma.shopAnalytics.findUnique({
+        where: { shopId: shop.id },
+      }),
+      prisma.userAnalytics.findMany({
+        take: 500,
+        orderBy: { lastVisited: 'desc' },
+      }),
+    ]);
 
     // 1. Calculate Monthly Revenue Performance (Last 6-7 Months)
     const monthNames = [
@@ -972,12 +1104,7 @@ export const getSellerDashboardAnalytics = async (
       });
     }
 
-    // 2. Calculate Device Usage (Phone, Tablet, Computer)
-    const userAnalyticsList = await prisma.userAnalytics.findMany({
-      take: 200,
-      orderBy: { lastVisited: 'desc' },
-    });
-
+    // 2. Calculate Device Usage (Phone, Tablet, Computer) from real analytics
     let phoneCount = 0;
     let tabletCount = 0;
     let computerCount = 0;
@@ -998,52 +1125,109 @@ export const getSellerDashboardAnalytics = async (
       }
     });
 
-    if (phoneCount === 0 && tabletCount === 0 && computerCount === 0) {
-      phoneCount = 52;
-      tabletCount = 18;
-      computerCount = 30;
+    const totalDevices = phoneCount + tabletCount + computerCount;
+    const deviceUsage = [
+      {
+        name: 'Phone',
+        value: totalDevices > 0 ? Math.round((phoneCount / totalDevices) * 100) : 55,
+        color: '#22c55e',
+      },
+      {
+        name: 'Tablet',
+        value: totalDevices > 0 ? Math.round((tabletCount / totalDevices) * 100) : 15,
+        color: '#f59e0b',
+      },
+      {
+        name: 'Computer',
+        value: totalDevices > 0 ? Math.round((computerCount / totalDevices) * 100) : 30,
+        color: '#3b82f6',
+      },
+    ];
+
+    // 3. Highlighted Visitors Distribution Countries (Aggregated from real user analytics)
+    const countryCounts: Record<string, number> = {};
+    userAnalyticsList.forEach((ua) => {
+      if (ua.country && typeof ua.country === 'string' && ua.country.trim()) {
+        const c = ua.country.trim();
+        countryCounts[c] = (countryCounts[c] || 0) + 1;
+      }
+    });
+
+    const countryCodeLookup: Record<string, string> = {
+      'United States': 'US',
+      'Canada': 'CA',
+      'United Kingdom': 'GB',
+      'India': 'IN',
+      'Pakistan': 'PK',
+      'Germany': 'DE',
+      'France': 'FR',
+      'Australia': 'AU',
+      'United Arab Emirates': 'AE',
+      'Saudi Arabia': 'SA',
+      'Bangladesh': 'BD',
+      'China': 'CN',
+      'Japan': 'JP',
+      'Brazil': 'BR',
+      'Spain': 'ES',
+      'Italy': 'IT',
+      'Netherlands': 'NL',
+    };
+
+    const totalCountryVisits =
+      Object.values(countryCounts).reduce((a, b) => a + b, 0) || 1;
+
+    let visitorsDistribution = Object.entries(countryCounts)
+      .map(([name, count]) => {
+        const code =
+          countryCodeLookup[name] ||
+          (name.length === 2 ? name.toUpperCase() : 'US');
+        return {
+          name,
+          code,
+          count,
+          percentage: Math.round((count / totalCountryVisits) * 100),
+          color: count > 10 ? '#22c55e' : '#3b82f6',
+        };
+      })
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 10);
+
+    // Initial baseline if platform has 0 visitor analytics records yet
+    if (visitorsDistribution.length === 0) {
+      visitorsDistribution = [
+        {
+          name: 'United States',
+          code: 'US',
+          count: 1420,
+          percentage: 48,
+          color: '#22c55e',
+        },
+        {
+          name: 'Canada',
+          code: 'CA',
+          count: 680,
+          percentage: 23,
+          color: '#3b82f6',
+        },
+        {
+          name: 'India',
+          code: 'IN',
+          count: 520,
+          percentage: 17,
+          color: '#22c55e',
+        },
+        {
+          name: 'United Kingdom',
+          code: 'GB',
+          count: 360,
+          percentage: 12,
+          color: '#3b82f6',
+        },
+      ];
     }
 
-    const deviceUsage = [
-      { name: 'Phone', value: phoneCount, color: '#22c55e' },
-      { name: 'Tablet', value: tabletCount, color: '#f59e0b' },
-      { name: 'Computer', value: computerCount, color: '#3b82f6' },
-    ];
-
-    // 3. Highlighted Visitors Distribution Countries
-    const defaultCountries = [
-      {
-        name: 'United States',
-        code: 'US',
-        count: 1420,
-        percentage: 48,
-        color: '#22c55e',
-      },
-      {
-        name: 'Canada',
-        code: 'CA',
-        count: 680,
-        percentage: 23,
-        color: '#3b82f6',
-      },
-      {
-        name: 'India',
-        code: 'IN',
-        count: 520,
-        percentage: 17,
-        color: '#22c55e',
-      },
-      {
-        name: 'United Kingdom',
-        code: 'GB',
-        count: 360,
-        percentage: 12,
-        color: '#3b82f6',
-      },
-    ];
-
-    // 4. Recent Orders
-    let recentOrders = orders.slice(0, 10).map((o, index) => {
+    // 4. Recent Real Orders (Empty array if no orders yet, no mock Bob Lee orders)
+    const recentOrders = orders.slice(0, 10).map((o, index) => {
       let displayStatus: 'Paid' | 'Pending' | 'Failed' = 'Paid';
       if (o.status === 'Cancelled' || o.paymentStatus === 'Failed') {
         displayStatus = 'Failed';
@@ -1059,116 +1243,41 @@ export const getSellerDashboardAnalytics = async (
 
       return {
         id: o.id,
-        orderId: `ORD-00${index + 1}`,
+        orderId: `ORD-${o.id.slice(-6).toUpperCase()}`,
         code: `#${o.id.slice(-6).toUpperCase()}`,
         customer:
           o.user?.name || (o.shippingAddress as any)?.name || 'Customer',
         customerEmail: o.user?.email || '',
         amount: Math.round(o.totalAmount),
-        amountFormatted: `$${Math.round(o.totalAmount)}`,
+        amountFormatted: `$${Number(o.totalAmount).toFixed(2)}`,
         status: displayStatus,
         rawStatus: o.status,
         date: o.createdAt,
       };
     });
 
-    // If newly created shop with no orders, provide elegant mock orders matching the design
-    if (recentOrders.length === 0) {
-      recentOrders = [
-        {
-          id: 'demo-1',
-          orderId: 'ORD-001',
-          code: '#ORD-001',
-          customer: 'John Doe',
-          customerEmail: 'john@example.com',
-          amount: 250,
-          amountFormatted: '$250',
-          status: 'Paid',
-          rawStatus: 'Delivered',
-          date: new Date(),
-        },
-        {
-          id: 'demo-2',
-          orderId: 'ORD-002',
-          code: '#ORD-002',
-          customer: 'Jane Smith',
-          customerEmail: 'jane@example.com',
-          amount: 180,
-          amountFormatted: '$180',
-          status: 'Pending',
-          rawStatus: 'Processing',
-          date: new Date(),
-        },
-        {
-          id: 'demo-3',
-          orderId: 'ORD-003',
-          code: '#ORD-003',
-          customer: 'Alice Johnson',
-          customerEmail: 'alice@example.com',
-          amount: 340,
-          amountFormatted: '$340',
-          status: 'Paid',
-          rawStatus: 'Delivered',
-          date: new Date(),
-        },
-        {
-          id: 'demo-4',
-          orderId: 'ORD-004',
-          code: '#ORD-004',
-          customer: 'Bob Lee',
-          customerEmail: 'bob@example.com',
-          amount: 90,
-          amountFormatted: '$90',
-          status: 'Failed',
-          rawStatus: 'Cancelled',
-          date: new Date(),
-        },
-        {
-          id: 'demo-5',
-          orderId: 'ORD-005',
-          code: '#ORD-005',
-          customer: 'Bob Lee',
-          customerEmail: 'bob@example.com',
-          amount: 90,
-          amountFormatted: '$90',
-          status: 'Failed',
-          rawStatus: 'Cancelled',
-          date: new Date(),
-        },
-        {
-          id: 'demo-6',
-          orderId: 'ORD-006',
-          code: '#ORD-006',
-          customer: 'Bob Lee',
-          customerEmail: 'bob@example.com',
-          amount: 90,
-          amountFormatted: '$90',
-          status: 'Failed',
-          rawStatus: 'Cancelled',
-          date: new Date(),
-        },
-      ];
-    }
-
     const totalRev = orders
       .filter((o) => o.status !== 'Cancelled')
       .reduce((sum, o) => sum + o.totalAmount, 0);
+
+    const totalStoreVisitors =
+      shopAnalytics?.views || userAnalyticsList.length || 0;
 
     return res.status(200).json({
       success: true,
       revenuePerformance: monthsData,
       deviceUsage,
-      visitorsDistribution: defaultCountries,
+      visitorsDistribution,
       recentOrders,
       stats: {
-        totalRevenue: Math.round((totalRev || 2850) * 100) / 100,
-        totalOrders: orders.length || 6,
-        processingOrders: orders.filter((o) => o.status === 'Processing')
-          .length || 1,
-        deliveredOrders: orders.filter((o) => o.status === 'Delivered')
-          .length || 2,
-        cancelledOrders: orders.filter((o) => o.status === 'Cancelled')
-          .length || 3,
+        totalRevenue: Math.round(totalRev * 100) / 100,
+        totalOrders: orders.length,
+        processingOrders: orders.filter((o) => o.status === 'Processing').length,
+        deliveredOrders: orders.filter((o) =>
+          ['Delivered', 'Completed'].includes(o.status),
+        ).length,
+        cancelledOrders: orders.filter((o) => o.status === 'Cancelled').length,
+        activeVisitors: totalStoreVisitors,
       },
     });
   } catch (error) {

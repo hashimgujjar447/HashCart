@@ -2,7 +2,7 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { ArrowUpRight, Zap } from 'lucide-react';
+import { ArrowUpRight, ShoppingBag } from 'lucide-react';
 
 export interface RecentOrderItem {
   id: string;
@@ -22,62 +22,11 @@ interface RecentOrdersTableProps {
   isLoading?: boolean;
 }
 
-const defaultOrders: RecentOrderItem[] = [
-  {
-    id: '1',
-    orderId: 'ORD-001',
-    customer: 'John Doe',
-    amount: 250,
-    amountFormatted: '$250',
-    status: 'Paid',
-  },
-  {
-    id: '2',
-    orderId: 'ORD-002',
-    customer: 'Jane Smith',
-    amount: 180,
-    amountFormatted: '$180',
-    status: 'Pending',
-  },
-  {
-    id: '3',
-    orderId: 'ORD-003',
-    customer: 'Alice Johnson',
-    amount: 340,
-    amountFormatted: '$340',
-    status: 'Paid',
-  },
-  {
-    id: '4',
-    orderId: 'ORD-004',
-    customer: 'Bob Lee',
-    amount: 90,
-    amountFormatted: '$90',
-    status: 'Failed',
-  },
-  {
-    id: '5',
-    orderId: 'ORD-005',
-    customer: 'Bob Lee',
-    amount: 90,
-    amountFormatted: '$90',
-    status: 'Failed',
-  },
-  {
-    id: '6',
-    orderId: 'ORD-006',
-    customer: 'Bob Lee',
-    amount: 90,
-    amountFormatted: '$90',
-    status: 'Failed',
-  },
-];
-
 export const RecentOrdersTable: React.FC<RecentOrdersTableProps> = ({
-  orders = defaultOrders,
+  orders = [],
   isLoading = false,
 }) => {
-  const displayOrders = orders && orders.length > 0 ? orders : defaultOrders;
+  const displayOrders = Array.isArray(orders) ? orders : [];
 
   const getStatusColor = (status: 'Paid' | 'Pending' | 'Failed') => {
     switch (status) {
@@ -117,67 +66,81 @@ export const RecentOrdersTable: React.FC<RecentOrdersTableProps> = ({
       {/* Table Container */}
       <div className="w-full flex-1 overflow-x-auto z-10">
         <div className="w-full border border-slate-800/80 rounded-xl overflow-hidden bg-[#0c121e]/70">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="border-b border-slate-800/90 bg-[#090d16]">
-                <th className="py-3 px-4 text-[12px] font-semibold text-slate-400 uppercase tracking-wider">
-                  Order ID
-                </th>
-                <th className="py-3 px-4 text-[12px] font-semibold text-slate-400 uppercase tracking-wider">
-                  Customer
-                </th>
-                <th className="py-3 px-4 text-[12px] font-semibold text-slate-400 uppercase tracking-wider">
-                  Amount
-                </th>
-                <th className="py-3 px-4 text-[12px] font-semibold text-slate-400 uppercase tracking-wider text-right">
-                  Status
-                </th>
-              </tr>
-            </thead>
+          {displayOrders.length === 0 && !isLoading ? (
+            <div className="flex flex-col items-center justify-center py-14 px-4 text-center">
+              <div className="w-12 h-12 rounded-2xl bg-slate-800/50 border border-slate-700/50 flex items-center justify-center text-slate-400 mb-3 shadow-inner">
+                <ShoppingBag className="w-6 h-6 text-slate-400" />
+              </div>
+              <p className="text-sm font-semibold text-slate-200">
+                No orders received yet
+              </p>
+              <p className="text-xs text-slate-400 mt-1 max-w-xs">
+                When customers purchase your products, their live order information will appear here.
+              </p>
+            </div>
+          ) : (
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="border-b border-slate-800/90 bg-[#090d16]">
+                  <th className="py-3 px-4 text-[12px] font-semibold text-slate-400 uppercase tracking-wider">
+                    Order ID
+                  </th>
+                  <th className="py-3 px-4 text-[12px] font-semibold text-slate-400 uppercase tracking-wider">
+                    Customer
+                  </th>
+                  <th className="py-3 px-4 text-[12px] font-semibold text-slate-400 uppercase tracking-wider">
+                    Amount
+                  </th>
+                  <th className="py-3 px-4 text-[12px] font-semibold text-slate-400 uppercase tracking-wider text-right">
+                    Status
+                  </th>
+                </tr>
+              </thead>
 
-            <tbody className="divide-y divide-slate-800/50 text-sm">
-              {isLoading
-                ? Array.from({ length: 6 }).map((_, i) => (
-                    <tr key={i} className="animate-pulse">
-                      <td className="py-3.5 px-4">
-                        <div className="h-4 w-16 bg-slate-800/60 rounded" />
-                      </td>
-                      <td className="py-3.5 px-4">
-                        <div className="h-4 w-28 bg-slate-800/60 rounded" />
-                      </td>
-                      <td className="py-3.5 px-4">
-                        <div className="h-4 w-14 bg-slate-800/60 rounded" />
-                      </td>
-                      <td className="py-3.5 px-4 text-right">
-                        <div className="h-4 w-12 bg-slate-800/60 rounded ml-auto" />
-                      </td>
-                    </tr>
-                  ))
-                : displayOrders.map((order, idx) => (
-                    <tr
-                      key={order.id || idx}
-                      className="hover:bg-slate-800/30 transition-colors group cursor-pointer"
-                    >
-                      <td className="py-3 px-4 font-mono text-[13px] text-slate-200 group-hover:text-blue-400 transition-colors">
-                        {order.orderId || `ORD-00${idx + 1}`}
-                      </td>
-                      <td className="py-3 px-4 text-slate-300 font-medium text-[13px]">
-                        {order.customer}
-                      </td>
-                      <td className="py-3 px-4 font-semibold text-white text-[13px]">
-                        {order.amountFormatted || `$${order.amount}`}
-                      </td>
-                      <td
-                        className={`py-3 px-4 text-right text-[13px] ${getStatusColor(
-                          order.status,
-                        )}`}
+              <tbody className="divide-y divide-slate-800/50 text-sm">
+                {isLoading
+                  ? Array.from({ length: 6 }).map((_, i) => (
+                      <tr key={i} className="animate-pulse">
+                        <td className="py-3.5 px-4">
+                          <div className="h-4 w-16 bg-slate-800/60 rounded" />
+                        </td>
+                        <td className="py-3.5 px-4">
+                          <div className="h-4 w-28 bg-slate-800/60 rounded" />
+                        </td>
+                        <td className="py-3.5 px-4">
+                          <div className="h-4 w-14 bg-slate-800/60 rounded" />
+                        </td>
+                        <td className="py-3.5 px-4 text-right">
+                          <div className="h-4 w-12 bg-slate-800/60 rounded ml-auto" />
+                        </td>
+                      </tr>
+                    ))
+                  : displayOrders.map((order, idx) => (
+                      <tr
+                        key={order.id || idx}
+                        className="hover:bg-slate-800/30 transition-colors group cursor-pointer"
                       >
-                        {order.status}
-                      </td>
-                    </tr>
-                  ))}
-            </tbody>
-          </table>
+                        <td className="py-3 px-4 font-mono text-[13px] text-slate-200 group-hover:text-blue-400 transition-colors">
+                          {order.orderId || `ORD-00${idx + 1}`}
+                        </td>
+                        <td className="py-3 px-4 text-slate-300 font-medium text-[13px]">
+                          {order.customer}
+                        </td>
+                        <td className="py-3 px-4 font-semibold text-white text-[13px]">
+                          {order.amountFormatted || `$${order.amount}`}
+                        </td>
+                        <td
+                          className={`py-3 px-4 text-right text-[13px] ${getStatusColor(
+                            order.status,
+                          )}`}
+                        >
+                          {order.status}
+                        </td>
+                      </tr>
+                    ))}
+              </tbody>
+            </table>
+          )}
         </div>
       </div>
     </div>
