@@ -26,6 +26,7 @@ import {
   changeUserPassword,
   getUserOrders,
   logoutUser,
+  logoutSeller,
   updateShopProfile,
   checkReviewEligibility,
   addReview,
@@ -82,5 +83,7 @@ router.post('/add-review', isAuthenticated, addReview);
 router.put('/toggle-follow-shop', isAuthenticated, toggleFollowShop);
 router.get('/logout', logoutUser);
 router.post('/logout', logoutUser);
+router.get('/logout-seller', logoutSeller);
+router.post('/logout-seller', logoutSeller);
 
 export default router;

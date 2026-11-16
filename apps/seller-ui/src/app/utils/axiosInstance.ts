@@ -61,7 +61,11 @@ axiosInstance.interceptors.response.use(
       console.log('[Axios] Attempting to refresh token at:', refreshUrl);
 
       try {
-        await axios.post(refreshUrl, {}, { withCredentials: true });
+        await axios.post(
+          refreshUrl,
+          { role: 'seller' },
+          { withCredentials: true },
+        );
         console.log(
           '[Axios] Token refreshed successfully! Retrying original request...',
         );

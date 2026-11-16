@@ -5,6 +5,11 @@ import prisma from '../../../../packages/libs/prisma';
 import { NextFunction, Request, Response } from 'express';
 import imageKit from '../../../../packages/libs/imageKit';
 import { Prisma } from '../../../../generated/prisma';
+import {
+  getCache,
+  setCache,
+  delCacheByPattern,
+} from '../../../../packages/redis/redis';
 
 export const getCategories = async (
   req: Request,
@@ -12,16 +17,25 @@ export const getCategories = async (
   next: NextFunction,
 ) => {
   try {
+    const cacheKey = 'cache:categories';
+    const cached = await getCache(cacheKey);
+    if (cached) {
+      return res.status(200).json(cached);
+    }
+
     const config = await prisma.site_config.findFirst();
 
     if (!config) {
       return res.status(404).json({ message: 'Categories not found' });
     }
 
-    return res.status(200).json({
+    const payload = {
       categories: config.categories,
       subCategories: config.subCategories,
-    });
+    };
+    await setCache(cacheKey, payload, 3600);
+
+    return res.status(200).json(payload);
   } catch (error) {
     return next(error);
   }
@@ -333,6 +347,9 @@ export const createProduct = async (
       },
     });
 
+    // Invalidate product catalog cache
+    await delCacheByPattern('cache:products:*');
+
     return res.status(201).json({
       success: true,
       message:
@@ -401,6 +418,12 @@ export const getAllProducts = async (
     const category = req.query.category as string;
     const subCategory = req.query.subCategory as string;
     const search = req.query.search as string;
+
+    const cacheKey = `cache:products:all:${page}:${limit}:${type || 'all'}:${category || 'all'}:${subCategory || 'all'}:${search || ''}`;
+    const cached = await getCache(cacheKey);
+    if (cached) {
+      return res.status(200).json(cached);
+    }
 
     const baseFilter: Prisma.productsWhereInput = {
       isDeleted: false,
@@ -476,16 +499,20 @@ export const getAllProducts = async (
       }),
     ]);
 
-    res.status(200).json({
+    const payload = {
       success: true,
       products,
       total,
       totalPages: Math.ceil(total / limit),
       currentPage: page,
       top10Products,
-    });
+    };
+
+    await setCache(cacheKey, payload, 900); // Cache for 15 mins
+
+    return res.status(200).json(payload);
   } catch (error) {
-    next(error);
+    return next(error);
   }
 };
 
@@ -520,6 +547,9 @@ export const deleteProductById = async (
         isDeleted: true,
       },
     });
+
+    await delCacheByPattern('cache:products:*');
+    await delCacheByPattern(`cache:product:${id}*`);
 
     res.status(200).json({
       success: true,
@@ -617,6 +647,12 @@ export const getProductById = async (
       return next(new ValidationError('Product ID is required'));
     }
 
+    const cacheKey = `cache:product:${id}`;
+    const cached = await getCache(cacheKey);
+    if (cached) {
+      return res.status(200).json(cached);
+    }
+
     const isObjectId = /^[0-9a-fA-F]{24}$/.test(id);
     const product = await prisma.products.findFirst({
       where: isObjectId
@@ -650,10 +686,18 @@ export const getProductById = async (
       return next(new ValidationError('Product not found'));
     }
 
-    res.status(200).json({
+    const payload = {
       success: true,
       product,
-    });
+    };
+
+    await setCache(cacheKey, payload, 1800); // Cache for 30 mins
+    // Also cache by product id if queried by slug
+    if (product.id && product.id !== id) {
+      await setCache(`cache:product:${product.id}`, payload, 1800);
+    }
+
+    res.status(200).json(payload);
   } catch (error) {
     next(error);
   }
@@ -686,6 +730,33 @@ export const getFilteredProducts = async (
     const parsedPage = Number(page) || 1;
     const parsedLimit = Number(limit) || 12;
 
+    const parsedCategories =
+      typeof categories === 'string'
+        ? categories.split(',').filter(Boolean)
+        : Array.isArray(categories)
+        ? (categories as string[])
+        : [];
+
+    const parsedColors =
+      typeof colors === 'string'
+        ? colors.split(',').filter(Boolean)
+        : Array.isArray(colors)
+        ? (colors as string[])
+        : [];
+
+    const parsedSizes =
+      typeof sizes === 'string'
+        ? sizes.split(',').filter(Boolean)
+        : Array.isArray(sizes)
+        ? (sizes as string[])
+        : [];
+
+    const cacheKey = `cache:products:filter:${parsedPage}:${parsedLimit}:${parsedPriceRange.join('-')}:${parsedCategories.sort().join('-')}:${parsedColors.sort().join('-')}:${parsedSizes.sort().join('-')}:${search || ''}:${brand || ''}:${sort || 'default'}`;
+    const cached = await getCache(cacheKey);
+    if (cached) {
+      return res.status(200).json(cached);
+    }
+
     const where: any = {
       isDeleted: false,
       status: 'Active',
@@ -703,32 +774,14 @@ export const getFilteredProducts = async (
       };
     }
 
-    const parsedCategories =
-      typeof categories === 'string'
-        ? categories.split(',').filter(Boolean)
-        : Array.isArray(categories)
-        ? (categories as string[])
-        : [];
     if (parsedCategories.length > 0) {
       where.category = { in: parsedCategories };
     }
 
-    const parsedColors =
-      typeof colors === 'string'
-        ? colors.split(',').filter(Boolean)
-        : Array.isArray(colors)
-        ? (colors as string[])
-        : [];
     if (parsedColors.length > 0) {
       where.colors = { hasSome: parsedColors };
     }
 
-    const parsedSizes =
-      typeof sizes === 'string'
-        ? sizes.split(',').filter(Boolean)
-        : Array.isArray(sizes)
-        ? (sizes as string[])
-        : [];
     if (parsedSizes.length > 0) {
       where.sizes = { hasSome: parsedSizes };
     }
@@ -769,13 +822,17 @@ export const getFilteredProducts = async (
       prisma.products.count({ where }),
     ]);
 
-    return res.status(200).json({
+    const payload = {
       success: true,
       products,
       total,
       totalPages: Math.ceil(total / parsedLimit),
       currentPage: parsedPage,
-    });
+    };
+
+    await setCache(cacheKey, payload, 600); // 10 mins
+
+    return res.status(200).json(payload);
   } catch (error) {
     return next(error);
   }
@@ -954,6 +1011,12 @@ export const editProduct = async (
       },
     });
 
+    await delCacheByPattern('cache:products:*');
+    await delCacheByPattern(`cache:product:${id}*`);
+    if (updatedProduct.slug) {
+      await delCacheByPattern(`cache:product:${updatedProduct.slug}*`);
+    }
+
     return res.status(200).json({
       success: true,
       message:
@@ -994,6 +1057,33 @@ export const getOfferProducts = async (
     const parsedPage = Number(page) || 1;
     const parsedLimit = Number(limit) || 12;
 
+    const parsedCategories =
+      typeof categories === 'string'
+        ? categories.split(',').filter(Boolean)
+        : Array.isArray(categories)
+        ? (categories as string[])
+        : [];
+
+    const parsedColors =
+      typeof colors === 'string'
+        ? colors.split(',').filter(Boolean)
+        : Array.isArray(colors)
+        ? (colors as string[])
+        : [];
+
+    const parsedSizes =
+      typeof sizes === 'string'
+        ? sizes.split(',').filter(Boolean)
+        : Array.isArray(sizes)
+        ? (sizes as string[])
+        : [];
+
+    const cacheKey = `cache:products:offers:${parsedPage}:${parsedLimit}:${parsedPriceRange.join('-')}:${parsedCategories.sort().join('-')}:${parsedColors.sort().join('-')}:${parsedSizes.sort().join('-')}:${search || ''}:${sort || 'default'}`;
+    const cached = await getCache(cacheKey);
+    if (cached) {
+      return res.status(200).json(cached);
+    }
+
     const where: any = {
       isDeleted: false,
       status: 'Active',
@@ -1022,32 +1112,14 @@ export const getOfferProducts = async (
       };
     }
 
-    const parsedCategories =
-      typeof categories === 'string'
-        ? categories.split(',').filter(Boolean)
-        : Array.isArray(categories)
-        ? (categories as string[])
-        : [];
     if (parsedCategories.length > 0) {
       where.category = { in: parsedCategories };
     }
 
-    const parsedColors =
-      typeof colors === 'string'
-        ? colors.split(',').filter(Boolean)
-        : Array.isArray(colors)
-        ? (colors as string[])
-        : [];
     if (parsedColors.length > 0) {
       where.colors = { hasSome: parsedColors };
     }
 
-    const parsedSizes =
-      typeof sizes === 'string'
-        ? sizes.split(',').filter(Boolean)
-        : Array.isArray(sizes)
-        ? (sizes as string[])
-        : [];
     if (parsedSizes.length > 0) {
       where.sizes = { hasSome: parsedSizes };
     }
@@ -1138,6 +1210,12 @@ export const getAllShops = async (
         : Array.isArray(rawCats)
         ? (rawCats as string[]).map((c) => String(c).trim()).filter(Boolean)
         : [];
+
+    const cacheKey = `cache:shops:all:${parsedPage}:${parsedLimit}:${parsedCategories.sort().join('-')}:${search || ''}:${sort || 'default'}`;
+    const cached = await getCache(cacheKey);
+    if (cached) {
+      return res.status(200).json(cached);
+    }
 
     const where: any = {};
 

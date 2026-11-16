@@ -2,6 +2,8 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { useSeller } from '@/app/hooks/useSeller';
 
 import { useForm, Controller } from 'react-hook-form';
 import { useMutation } from '@tanstack/react-query';
@@ -65,6 +67,15 @@ type ApiErrorResponse = {
 };
 
 const RegisterPage = () => {
+  const router = useRouter();
+  const { seller, isLoading } = useSeller();
+
+  useEffect(() => {
+    if (!isLoading && seller) {
+      router.replace('/dashboard');
+    }
+  }, [seller, isLoading, router]);
+
   const [activeState, setActiveState] = useState(1);
   const [passwordVisible, setPasswordVisible] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);

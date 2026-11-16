@@ -38,11 +38,11 @@ export const useUser = () => {
     if (!isLoading) {
       if (user) {
         setUser(user);
-      } else if (user === null && !cachedUser) {
+      } else if (user === null) {
         clearUser();
       }
     }
-  }, [user, isLoading, cachedUser, setUser, clearUser]);
+  }, [user, isLoading, setUser, clearUser]);
 
   // Active user: prefer live user if present, fallback to cachedUser while loading
   const activeUser =

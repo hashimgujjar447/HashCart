@@ -13,7 +13,7 @@ export default function LogoutPage() {
   useEffect(() => {
     const performLogout = async () => {
       try {
-        await axiosInstance.post('/auth/logout');
+        await axiosInstance.post('/auth/logout-seller');
       } catch (err) {
         console.error('Logout error:', err);
       } finally {

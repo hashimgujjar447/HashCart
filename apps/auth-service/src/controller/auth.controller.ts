@@ -12,7 +12,12 @@ import Stripe from 'stripe';
 
 import prisma from '../../../../packages/libs/prisma';
 import { AuthError, ValidationError } from '../../../../packages/error-handler';
-import { redisClient } from '../../../../packages/redis/redis';
+import {
+  redisClient,
+  getCache,
+  setCache,
+  delCacheByPattern,
+} from '../../../../packages/redis/redis';
 import bcrypt from 'bcryptjs';
 import jwt, { JsonWebTokenError } from 'jsonwebtoken';
 import { setCookie } from '../utils/cookies/setCookie';
@@ -123,18 +128,16 @@ export const loginUser = async (
     const accessToken = jwt.sign(
       { userId: user.id, email: user.email, role: 'user' },
       process.env.ACCESS_TOKEN_SECRET!,
-      { expiresIn: '15m' },
+      { expiresIn: '2h' },
     );
 
     const refreshToken = jwt.sign(
       { userId: user.id, email: user.email, role: 'user' },
       process.env.REFRESH_TOKEN_SECRET!,
-      { expiresIn: '7d' },
+      { expiresIn: '14d' },
     );
 
-    // Clear previous cookies first
-    res.clearCookie('sellerAccessToken', { path: '/' });
-    res.clearCookie('sellerRefreshToken', { path: '/' });
+    // Clear previous user cookies only (do NOT clear seller cookies so sessions co-exist on localhost)
     res.clearCookie('accessToken', { path: '/' });
     res.clearCookie('refreshToken', { path: '/' });
 
@@ -240,10 +243,17 @@ export const refreshToken = async (
   next: NextFunction,
 ) => {
   try {
-    // Support both user and seller refresh tokens
-    const token = req.cookies.refreshToken || req.cookies.sellerRefreshToken;
+    // Intelligent caller detection: distinguish seller vs user refresh requests
     const isSeller =
-      !!req.cookies.sellerRefreshToken && !req.cookies.refreshToken;
+      req.headers.origin?.includes('3001') ||
+      req.headers.referer?.includes('3001') ||
+      req.query?.role === 'seller' ||
+      req.body?.role === 'seller' ||
+      (!!req.cookies.sellerRefreshToken && !req.cookies.refreshToken);
+
+    const token = isSeller
+      ? req.cookies.sellerRefreshToken || req.cookies.refreshToken
+      : req.cookies.refreshToken || req.cookies.sellerRefreshToken;
 
     if (!token) {
       return next(new ValidationError('Refresh token is required'));
@@ -287,7 +297,7 @@ export const refreshToken = async (
     const accessToken = jwt.sign(
       { userId, email, role },
       process.env.ACCESS_TOKEN_SECRET!,
-      { expiresIn: '15m' },
+      { expiresIn: '2h' },
     );
 
     const cookieName = role === 'seller' ? 'sellerAccessToken' : 'accessToken';
@@ -295,6 +305,7 @@ export const refreshToken = async (
 
     res.status(200).json({
       message: 'Access token refreshed successfully',
+      role,
     });
   } catch (error) {
     return next(error);
@@ -566,19 +577,18 @@ export const loginSeller = async (
     const accessToken = jwt.sign(
       { userId: user.id, email: user.email, role: 'seller' },
       process.env.ACCESS_TOKEN_SECRET!,
-      { expiresIn: '15m' },
+      { expiresIn: '2h' },
     );
 
     const refreshToken = jwt.sign(
       { userId: user.id, email: user.email, role: 'seller' },
       process.env.REFRESH_TOKEN_SECRET!,
-      { expiresIn: '7d' },
+      { expiresIn: '14d' },
     );
 
-    res.clearCookie('accessToken');
-    res.clearCookie('refreshToken');
-    res.clearCookie('sellerAccessToken');
-    res.clearCookie('sellerRefreshToken');
+    // Clear previous seller cookies only (do NOT clear user cookies so sessions co-exist on localhost)
+    res.clearCookie('sellerAccessToken', { path: '/' });
+    res.clearCookie('sellerRefreshToken', { path: '/' });
 
     setCookie(res, 'sellerAccessToken', accessToken);
     setCookie(res, 'sellerRefreshToken', refreshToken);
@@ -716,6 +726,12 @@ export const getAllShops = async (
         ? (rawCats as string[]).map((c) => String(c).trim()).filter(Boolean)
         : [];
 
+    const cacheKey = `cache:shops:all:${parsedPage}:${parsedLimit}:${parsedCategories.sort().join('-')}:${search || ''}:${sort || 'default'}`;
+    const cached = await getCache(cacheKey);
+    if (cached) {
+      return res.status(200).json(cached);
+    }
+
     const where: any = {};
 
     if (parsedCategories.length > 0) {
@@ -794,13 +810,17 @@ export const getAllShops = async (
       }),
     );
 
-    return res.status(200).json({
+    const payload = {
       success: true,
       shops: enhancedShops,
       total,
       totalPages: Math.ceil(total / parsedLimit) || 1,
       currentPage: parsedPage,
-    });
+    };
+
+    await setCache(cacheKey, payload, 1800); // 30 mins
+
+    return res.status(200).json(payload);
   } catch (error) {
     return next(error);
   }
@@ -815,6 +835,12 @@ export const getShopById = async (
     const id = req.params.id as string;
     if (!id) {
       return next(new ValidationError('Shop ID is required'));
+    }
+
+    const cacheKey = `cache:shop:${id}`;
+    const cached = await getCache(cacheKey);
+    if (cached) {
+      return res.status(200).json(cached);
     }
 
     const shop = await prisma.shops.findUnique({
@@ -863,13 +889,17 @@ export const getShopById = async (
       },
     });
 
-    return res.status(200).json({
+    const payload = {
       success: true,
       shop: {
         ...shop,
         followersCount,
       },
-    });
+    };
+
+    await setCache(cacheKey, payload, 1800); // 30 mins
+
+    return res.status(200).json(payload);
   } catch (error) {
     return next(error);
   }
@@ -1172,13 +1202,28 @@ export const logoutUser = async (
   next: NextFunction,
 ) => {
   try {
-    res.clearCookie('accessToken');
-    res.clearCookie('refreshToken');
-    res.clearCookie('sellerAccessToken');
-    res.clearCookie('sellerRefreshToken');
+    res.clearCookie('accessToken', { path: '/' });
+    res.clearCookie('refreshToken', { path: '/' });
     return res.status(200).json({
       success: true,
-      message: 'Logged out successfully',
+      message: 'User logged out successfully',
+    });
+  } catch (error) {
+    return next(error);
+  }
+};
+
+export const logoutSeller = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) => {
+  try {
+    res.clearCookie('sellerAccessToken', { path: '/' });
+    res.clearCookie('sellerRefreshToken', { path: '/' });
+    return res.status(200).json({
+      success: true,
+      message: 'Seller logged out successfully',
     });
   } catch (error) {
     return next(error);
@@ -1314,6 +1359,10 @@ export const updateShopProfile = async (
         },
       },
     });
+
+    // Invalidate shop caches
+    await delCacheByPattern('cache:shops:*');
+    await delCacheByPattern(`cache:shop:${shop.id}*`);
 
     return res.status(200).json({
       success: true,
@@ -1649,6 +1698,9 @@ export const toggleFollowShop = async (
         },
       },
     });
+
+    await delCacheByPattern('cache:shops:*');
+    await delCacheByPattern(`cache:shop:${shopId}*`);
 
     return res.status(200).json({
       success: true,

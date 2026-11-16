@@ -7,11 +7,8 @@ const fetchSeller = async () => {
       withCredentials: true,
     });
     return response.data?.seller ?? response.data?.user ?? null;
-  } catch (error: any) {
-    if (error?.response?.status === 401) {
-      return null;
-    }
-    throw error;
+  } catch {
+    return null;
   }
 };
 

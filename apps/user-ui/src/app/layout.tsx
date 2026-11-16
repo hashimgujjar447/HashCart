@@ -3,6 +3,7 @@ import Footer from '@/shared/widgets/footer/Footer';
 import './global.css';
 import { Poppins, Roboto } from 'next/font/google';
 import QueryProvider from './providers';
+import AuthInitializer from '@/shared/providers/AuthInitializer';
 
 export const metadata = {
   title: 'HashCart',
@@ -31,9 +32,11 @@ export default function RootLayout({
     <html lang="en">
       <body className={`${roboto.variable} ${poppins.variable} `}>
         <QueryProvider>
-          <Header />
-          <main className="min-h-[calc(100vh-250px)]">{children}</main>
-          <Footer />
+          <AuthInitializer>
+            <Header />
+            <main className="min-h-[calc(100vh-250px)]">{children}</main>
+            <Footer />
+          </AuthInitializer>
         </QueryProvider>
       </body>
     </html>

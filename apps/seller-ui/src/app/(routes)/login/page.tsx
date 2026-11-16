@@ -1,11 +1,12 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import axiosInstance from '@/app/utils/axiosInstance';
+import { useSeller } from '@/app/hooks/useSeller';
 
 type FormData = {
   email: string;
@@ -18,18 +19,25 @@ const LoginPage = () => {
   const [serverError, setServerError] = useState<string | null>(null);
 
   const router = useRouter();
+  const queryClient = useQueryClient();
+  const { seller, isLoading } = useSeller();
+
+  // If already authenticated, redirect immediately to dashboard
+  useEffect(() => {
+    if (!isLoading && seller) {
+      router.replace('/dashboard');
+    }
+  }, [seller, isLoading, router]);
 
   const loginMutation = useMutation({
     mutationFn: async (data: FormData) => {
-      const response = await axiosInstance.post(
-        '/auth/login-seller',
-        data,
-      );
+      const response = await axiosInstance.post('/auth/login-seller', data);
       return response.data;
     },
     onSuccess: (data) => {
       console.log('User logged in successfully:', data);
       setServerError(null); // Clear any previous error
+      queryClient.invalidateQueries({ queryKey: ['seller'] });
       router.push('/dashboard');
     },
     onError: (error: any) => {
@@ -55,7 +63,7 @@ const LoginPage = () => {
   };
 
   return (
-    <div className="w-full min-h-[85vh] bg-[#f5f5f5] py-12 flex flex-col items-center justify-center font-poppins">
+    <div className="w-full min-h-screen bg-[#f5f5f5] py-12 flex flex-col items-center justify-center font-poppins">
       <div className="text-center mb-6">
         <h1 className="text-3xl font-bold text-gray-900">Login</h1>
         <p className="text-xs text-gray-500 mt-1">
